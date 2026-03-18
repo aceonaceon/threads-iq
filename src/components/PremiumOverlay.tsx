@@ -12,9 +12,10 @@ interface PremiumOverlayProps {
 export default function PremiumOverlay({ featureName }: PremiumOverlayProps) {
   const { user } = useAuth();
   
-  // For now, since there's no Stripe yet, show overlay for all authenticated users
-  // Once paid plans exist, check: (user as any)?.plan !== 'creator' && (user as any)?.plan !== 'pro'
-  const showOverlay = !user;
+  // Show overlay for users without a paid plan
+  // Once Stripe is integrated, check user.plan === 'creator' or 'pro' to skip overlay
+  const userPlan = (user as any)?.plan;
+  const showOverlay = !userPlan || (userPlan !== 'creator' && userPlan !== 'pro');
 
   if (!showOverlay) {
     return null;
