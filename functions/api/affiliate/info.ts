@@ -106,6 +106,29 @@ export const onRequestGet: PagesFunction<Env> = async (context): Promise<Respons
 
   let userData = JSON.parse(userStr);
   userData = checkAndResetWeeklyQuota(userData);
+
+  // Backfill referral code for users registered before affiliate system
+  if (!userData.referralCode) {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(payload.sub + context.env.LINE_CHANNEL_SECRET);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = new Uint8Array(hashBuffer);
+    let hex = '';
+    for (const b of hashArray) {
+      hex += b.toString(16).padStart(2, '0');
+    }
+    userData.referralCode = hex.substring(0, 8);
+    userData.bonusUses = userData.bonusUses || 0;
+    userData.totalReferrals = userData.totalReferrals || 0;
+    userData.commissionBalance = userData.commissionBalance || 0;
+    userData.weeklyUses = userData.weeklyUses || 0;
+    userData.weeklyResetAt = userData.weeklyResetAt || new Date().toISOString();
+
+    // Save backfilled data
+    await context.env.THREADSIQ_STORE.put(`user:${payload.sub}`, JSON.stringify(userData));
+    // Also register the referral code lookup
+    await context.env.THREADSIQ_STORE.put(`ref:${userData.referralCode}`, payload.sub);
+  }
   
   const FREE_USES = 3;
   const weeklyRemaining = Math.max(0, FREE_USES - (userData.weeklyUses || 0));
@@ -114,13 +137,11 @@ export const onRequestGet: PagesFunction<Env> = async (context): Promise<Respons
   // Get referral list
   const referralListKey = `referrals:${payload.sub}`;
   const referralListStr = await context.env.THREADSIQ_STORE.get(referralListKey);
-  const referralList = referralListStr ? JSON.parse(referrerListStr) : [];
+  const referralList = referralListStr ? JSON.parse(referralListStr) : [];
 
   return new Response(JSON.stringify({
-    referralCode: userData.referralCode || '',
-    referralLink: userData.referralCode 
-      ? `https://threads-iq.pages.dev/?ref=${userData.referralCode}`
-      : '',
+    referralCode: userData.referralCode,
+    referralLink: `https://threads-iq.pages.dev/?ref=${userData.referralCode}`,
     totalReferrals: userData.totalReferrals || 0,
     bonusUses,
     weeklyRemaining,
