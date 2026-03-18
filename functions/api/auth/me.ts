@@ -12,6 +12,16 @@ interface TokenPayload {
   exp: number;
 }
 
+// Unicode-safe base64 decode
+function base64Decode(str: string): string {
+  const binary = atob(str);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return new TextDecoder().decode(bytes);
+}
+
 async function verifyToken(token: string, secret: string): Promise<TokenPayload | null> {
   try {
     const [payloadStr, sigStr] = token.split('.');
@@ -26,11 +36,16 @@ async function verifyToken(token: string, secret: string): Promise<TokenPayload 
       ['sign']
     );
     const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(payloadStr));
-    const expectedSig = btoa(String.fromCharCode(...new Uint8Array(signature)));
+    const sigBytes = new Uint8Array(signature);
+    let sigBinary = '';
+    for (const byte of sigBytes) {
+      sigBinary += String.fromCharCode(byte);
+    }
+    const expectedSig = btoa(sigBinary);
     
     if (sigStr !== expectedSig) return null;
     
-    const payload = JSON.parse(atob(payloadStr)) as TokenPayload;
+    const payload = JSON.parse(base64Decode(payloadStr)) as TokenPayload;
     
     // Check expiration
     const now = Math.floor(Date.now() / 1000);
