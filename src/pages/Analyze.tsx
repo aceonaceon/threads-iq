@@ -4,7 +4,6 @@ import { useAuth } from '../lib/auth';
 import PostInput from '../components/PostInput';
 import { runAnalysis, getTopicAnalysisWithClusters, AnalysisResult } from '../lib/api';
 import { runAnalysis as runClientAnalysis, calculateHealthScore } from '../lib/analysis';
-import PremiumOverlay from '../components/PremiumOverlay';
 
 const MIN_POSTS = 5;
 const MAX_POSTS = 30;
@@ -365,9 +364,7 @@ export default function Analyze() {
 
           {/* Threads OAuth Section */}
           {isAuthenticated && user && (
-            <div className="relative">
-              <PremiumOverlay featureName="Threads 自動匯入" requiredPlan="creator" />
-              <div className="bg-surface rounded-xl p-6 mb-8 border border-gray-800">
+            <div className="bg-surface rounded-xl p-6 mb-8 border border-gray-800">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
                   <div className="text-2xl">🧵</div>
@@ -382,15 +379,41 @@ export default function Analyze() {
                 </div>
                 
                 {!threadsConnected ? (
-                  <button
-                    onClick={connectThreads}
-                    className="px-4 py-2 bg-[#1877F2] hover:bg-[#1861CB] text-white font-medium rounded-lg transition-colors flex items-center gap-2"
-                  >
-                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M12 2C6.477 2 2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.879V14.89h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.989C18.343 21.129 22 16.99 22 12c0-5.523-4.477-10-10-10z"/>
-                    </svg>
-                    連結 Threads
-                  </button>
+                  // Check if user has premium plan
+                  ((user as any)?.plan === 'creator' || (user as any)?.plan === 'pro') ? (
+                    <button
+                      onClick={connectThreads}
+                      className="px-4 py-2 bg-[#1877F2] hover:bg-[#1861CB] text-white font-medium rounded-lg transition-colors flex items-center gap-2"
+                    >
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2C6.477 2 2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.879V14.89h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.989C18.343 21.129 22 16.99 22 12c0-5.523-4.477-10-10-10z"/>
+                      </svg>
+                      連結 Threads
+                    </button>
+                  ) : (
+                    // Free user - show locked button with tooltip
+                    <div className="relative group">
+                      <button
+                        className="px-4 py-2 bg-gray-700 text-gray-400 font-medium rounded-lg transition-colors flex items-center gap-2 cursor-not-allowed"
+                        disabled
+                      >
+                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M12 2C6.477 2 2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.879V14.89h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.989C18.343 21.129 22 16.99 22 12c0-5.523-4.477-10-10-10z"/>
+                        </svg>
+                        連結 Threads
+                        <span className="ml-1 text-xs px-1.5 py-0.5 bg-yellow-500/20 text-yellow-500 rounded">進階會員</span>
+                      </button>
+                      {/* Tooltip */}
+                      <div className="absolute right-0 top-full mt-2 w-64 bg-gray-900 border border-gray-700 rounded-lg p-3 shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                        <p className="text-sm text-gray-300">
+                          進階會員功能 — 升級後可自動匯入 Threads 貼文
+                        </p>
+                        <a href="/#pricing" className="text-xs text-accent hover:text-accent-hover mt-2 inline-block">
+                          了解方案 →
+                        </a>
+                      </div>
+                    </div>
+                  )
                 ) : (
                   <button
                     onClick={importFromThreads}
@@ -424,7 +447,6 @@ export default function Analyze() {
                   {threadsAuthMessage}
                 </div>
               )}
-            </div>
             </div>
           )}
 

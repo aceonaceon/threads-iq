@@ -428,7 +428,7 @@ export default function Landing() {
       {/* Section 8: 定價方案 */}
       <section className="py-20 px-4">
         <div className="max-w-5xl mx-auto">
-          <h2 className="text-3xl font-bold text-center mb-4">選擇你的方案</h2>
+          <h2 id="pricing" className="text-3xl font-bold text-center mb-4">選擇你的方案</h2>
           <p className="text-gray-400 text-center mb-12 text-sm">
             目前語意分析功能完全免費開放。進階功能陸續上線中。
           </p>
