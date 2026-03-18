@@ -42,6 +42,7 @@ export const onRequestPost: PagesFunction<Env> = async (context): Promise<Respon
     }
 
     const apiKey = context.env.OPENAI_API_KEY;
+    console.log('API Key present:', !!apiKey);
     if (!apiKey) {
       console.error('OPENAI_API_KEY not configured');
       return new Response(
