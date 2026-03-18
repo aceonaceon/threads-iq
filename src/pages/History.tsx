@@ -15,9 +15,19 @@ export default function History() {
   const [analyses, setAnalyses] = useState<StoredAnalysis[]>([]);
 
   useEffect(() => {
-    const stored = JSON.parse(localStorage.getItem('threadsiq_analyses') || '[]');
-    setAnalyses(stored);
-  }, []);
+    if (user) {
+      const stored = JSON.parse(localStorage.getItem(`threadsiq_analyses_${user.id}`) || '[]');
+      setAnalyses(stored);
+    }
+  }, [user]);
+
+  const clearHistory = () => {
+    if (user && confirm('確定要清除所有歷史紀錄？')) {
+      localStorage.removeItem(`threadsiq_analyses_${user.id}`);
+      localStorage.removeItem(`threadsiq_usage_${user.id}`);
+      setAnalyses([]);
+    }
+  };
 
   const getScoreColor = (score: number) => {
     if (score >= 80) return '#22C55E';
@@ -59,12 +69,22 @@ export default function History() {
             <h1 className="text-3xl font-bold mb-2">歷史記錄</h1>
             <p className="text-gray-500">追蹤你的內容演變</p>
           </div>
-          <Link
-            to="/analyze"
-            className="px-4 py-2 bg-accent hover:bg-accent-hover text-white text-sm font-medium rounded-lg transition-colors"
-          >
-            + 新分析
-          </Link>
+          <div className="flex gap-2">
+            {analyses.length > 0 && (
+              <button
+                onClick={clearHistory}
+                className="px-4 py-2 border border-red-500/30 text-red-400 hover:bg-red-500/10 text-sm font-medium rounded-lg transition-colors"
+              >
+                清除紀錄
+              </button>
+            )}
+            <Link
+              to="/analyze"
+              className="px-4 py-2 bg-accent hover:bg-accent-hover text-white text-sm font-medium rounded-lg transition-colors"
+            >
+              + 新分析
+            </Link>
+          </div>
         </div>
 
         {analyses.length === 0 ? (

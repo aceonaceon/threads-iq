@@ -1,58 +1,62 @@
 // @ts-ignore - umap-js type issue
-import UMAP from 'umap-js';
+import { UMAP } from 'umap-js';
 
-// Simple DBSCAN implementation
+// Cosine distance between two vectors (0 = identical, 2 = opposite)
+function cosineDistance(a: number[], b: number[]): number {
+  let dot = 0, normA = 0, normB = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    normA += a[i] * a[i];
+    normB += b[i] * b[i];
+  }
+  const denom = Math.sqrt(normA) * Math.sqrt(normB);
+  if (denom === 0) return 1;
+  return 1 - dot / denom;
+}
+
+// DBSCAN with custom distance function
 class DBSCAN {
-  run(points: number[][], epsilon: number, minPts: number): number[][] {
-    const labels: number[] = new Array(points.length).fill(-1);
+  private distMatrix: number[][];
+
+  constructor(distMatrix: number[][]) {
+    this.distMatrix = distMatrix;
+  }
+
+  run(epsilon: number, minPts: number): { labels: number[]; clusterCount: number } {
+    const n = this.distMatrix.length;
+    const labels = new Array(n).fill(-1);
+    const visited = new Array(n).fill(false);
     let clusterId = 0;
 
-    for (let i = 0; i < points.length; i++) {
-      if (labels[i] !== -1) continue;
+    for (let i = 0; i < n; i++) {
+      if (visited[i]) continue;
+      visited[i] = true;
 
-      const neighbors = this.getNeighbors(points, i, epsilon);
+      const neighbors = this.regionQuery(i, epsilon);
       if (neighbors.length < minPts) {
         labels[i] = -1; // Noise
       } else {
-        this.expandCluster(points, labels, i, neighbors, clusterId, epsilon, minPts);
+        this.expandCluster(labels, visited, i, neighbors, clusterId, epsilon, minPts);
         clusterId++;
       }
     }
 
-    const clusters: number[][] = [];
-    for (let c = 0; c < clusterId; c++) {
-      clusters.push([]);
-    }
-    for (let i = 0; i < labels.length; i++) {
-      if (labels[i] >= 0) {
-        clusters[labels[i]].push(i);
-      }
-    }
-
-    return clusters.filter(c => c.length > 0);
+    return { labels, clusterCount: clusterId };
   }
 
-  private getNeighbors(points: number[][], i: number, epsilon: number): number[] {
+  private regionQuery(i: number, epsilon: number): number[] {
     const neighbors: number[] = [];
-    for (let j = 0; j < points.length; j++) {
-      if (this.distance(points[i], points[j]) <= epsilon) {
+    for (let j = 0; j < this.distMatrix.length; j++) {
+      if (this.distMatrix[i][j] <= epsilon) {
         neighbors.push(j);
       }
     }
     return neighbors;
   }
 
-  private distance(a: number[], b: number[]): number {
-    let sum = 0;
-    for (let i = 0; i < a.length; i++) {
-      sum += (a[i] - b[i]) ** 2;
-    }
-    return Math.sqrt(sum);
-  }
-
   private expandCluster(
-    points: number[][],
     labels: number[],
+    visited: boolean[],
     pointIdx: number,
     neighbors: number[],
     clusterId: number,
@@ -61,34 +65,40 @@ class DBSCAN {
   ) {
     labels[pointIdx] = clusterId;
     const queue = [...neighbors];
+    const inQueue = new Set(neighbors);
 
     while (queue.length > 0) {
       const current = queue.shift()!;
-      if (labels[current] === -1) {
-        labels[current] = clusterId;
-        const newNeighbors = this.getNeighbors(points, current, epsilon);
+
+      if (!visited[current]) {
+        visited[current] = true;
+        const newNeighbors = this.regionQuery(current, epsilon);
         if (newNeighbors.length >= minPts) {
-          queue.push(...newNeighbors);
+          for (const nn of newNeighbors) {
+            if (!inQueue.has(nn)) {
+              queue.push(nn);
+              inQueue.add(nn);
+            }
+          }
         }
-      } else if (labels[current] === -1) {
-        // Already visited but was noise, now part of cluster
+      }
+
+      if (labels[current] === -1) {
         labels[current] = clusterId;
       }
     }
   }
 }
 
-// UMAP dimensionality reduction
-function reduceDimensionality(embeddings: number[][], nComponents: number = 2): number[][] {
+// UMAP dimensionality reduction (for visualization only)
+function reduceDimensionality(embeddings: number[][]): number[][] {
   const n = embeddings.length;
-  
-  if (n <= nComponents) {
-    return embeddings.map(e => [...e.slice(0, nComponents)]);
+  if (n <= 2) {
+    return embeddings.map(e => [e[0] || 0, e[1] || 0]);
   }
 
-  // Use UMAP for dimensionality reduction
   const umap = new UMAP({
-    nComponents,
+    nComponents: 2,
     nNeighbors: Math.min(15, n - 1),
     minDist: 0.1,
     spread: 1.0,
@@ -106,27 +116,43 @@ export interface AnalysisResult {
 }
 
 export function runAnalysis(embeddings: number[][]): AnalysisResult {
-  // Step 1: Reduce dimensionality with UMAP
-  const points2D = reduceDimensionality(embeddings, 2);
+  const n = embeddings.length;
 
-  // Step 2: Run DBSCAN
-  const dbscan = new DBSCAN();
-  const epsilon = Math.max(0.5, 1.5 - (embeddings.length - 5) * 0.05); // Adaptive epsilon
-  const minPts = Math.max(2, Math.floor(embeddings.length * 0.2));
-  
-  const clusters = dbscan.run(points2D, epsilon, minPts);
+  // Step 1: Build cosine distance matrix on RAW embeddings (1536-dim)
+  const distMatrix: number[][] = Array.from({ length: n }, () => new Array(n).fill(0));
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      const d = cosineDistance(embeddings[i], embeddings[j]);
+      distMatrix[i][j] = d;
+      distMatrix[j][i] = d;
+    }
+  }
 
-  // Step 3: Map cluster assignments
-  const labels = new Array(embeddings.length).fill(-1);
-  clusters.forEach((cluster, idx) => {
-    cluster.forEach(pointIdx => {
-      labels[pointIdx] = idx;
-    });
-  });
+  // Step 2: Adaptive epsilon using k-distance curve on cosine distances
+  const k = Math.max(3, Math.min(5, Math.floor(n * 0.1)));
+  const kthDists: number[] = [];
+  for (let i = 0; i < n; i++) {
+    const sorted = [...distMatrix[i]].filter((_, j) => j !== i).sort((a, b) => a - b);
+    kthDists.push(sorted[k - 1]);
+  }
+  kthDists.sort((a, b) => a - b);
 
-  const clusterCount = clusters.length;
+  // Use 75th percentile — balanced: catches true outliers without over-filtering
+  const epsilon = kthDists[Math.floor(kthDists.length * 0.75)];
+  const minPts = Math.max(2, Math.floor(n * 0.08));
+
+  // Step 3: DBSCAN on cosine distance matrix
+  const dbscan = new DBSCAN(distMatrix);
+  const { labels, clusterCount } = dbscan.run(epsilon, minPts);
+
+  // Step 4: UMAP for visualization only
+  const points2D = reduceDimensionality(embeddings);
+
   const noiseCount = labels.filter(l => l === -1).length;
-  const clusterSizes = clusters.map(c => c.length);
+  const clusterSizes: number[] = [];
+  for (let c = 0; c < clusterCount; c++) {
+    clusterSizes.push(labels.filter(l => l === c).length);
+  }
 
   return {
     points2D,
@@ -145,7 +171,6 @@ export function calculateHealthScore(
   const n = embeddings.length;
   if (n === 0) return 0;
 
-  // 1. Concentration (40%): Largest cluster % of total
   const clusterSizes = new Map<number, number>();
   let noiseCount = 0;
   for (const label of labels) {
@@ -156,31 +181,40 @@ export function calculateHealthScore(
     }
   }
 
+  // 1. Concentration (30%): Largest cluster % of non-noise posts
+  const nonNoise = n - noiseCount;
   const maxClusterSize = Math.max(...Array.from(clusterSizes.values()), 0);
-  const concentration = maxClusterSize / n;
+  const concentration = nonNoise > 0 ? maxClusterSize / nonNoise : 0;
 
-  // 2. Coherence (30%): Average intra-cluster similarity (simplified)
-  // Using variance of cluster sizes as proxy
-  const sizes = Array.from(clusterSizes.values());
-  const avgSize = sizes.length > 0 ? sizes.reduce((a, b) => a + b, 0) / sizes.length : 0;
-  const variance = sizes.length > 0 
-    ? sizes.reduce((acc, s) => acc + (s - avgSize) ** 2, 0) / sizes.length 
-    : 0;
-  const normalizedVariance = avgSize > 0 ? Math.min(variance / (avgSize * avgSize), 1) : 1;
-  const coherence = 1 - normalizedVariance;
+  // 2. Coverage (30%): % of posts in clusters (not noise)
+  const coverage = nonNoise / n;
 
-  // 3. Coverage (20%): % of posts in clusters
-  const coverage = (n - noiseCount) / n;
+  // 3. Coherence (25%): Average intra-cluster cosine similarity
+  let totalSim = 0;
+  let pairCount = 0;
+  for (const [clusterId] of clusterSizes) {
+    const members = labels
+      .map((l, i) => l === clusterId ? i : -1)
+      .filter(i => i >= 0);
+    for (let a = 0; a < members.length; a++) {
+      for (let b = a + 1; b < members.length; b++) {
+        totalSim += 1 - cosineDistance(embeddings[members[a]], embeddings[members[b]]);
+        pairCount++;
+      }
+    }
+  }
+  const coherence = pairCount > 0 ? totalSim / pairCount : 0;
 
-  // 4. Balance (10%): Evenness of cluster sizes (simplified Gini)
-  const balance = clusterCount > 1 ? 1 - (variance / (avgSize * avgSize || 1)) : 1;
+  // 4. Focus (15%): Penalty for too many tiny clusters (fragmentation)
+  const idealClusters = Math.max(1, Math.floor(n / 8)); // ~1 cluster per 8 posts
+  const focusRatio = clusterCount <= idealClusters ? 1 : idealClusters / clusterCount;
 
   // Weighted score
   const score = (
-    concentration * 0.4 +
-    coherence * 0.3 +
-    coverage * 0.2 +
-    balance * 0.1
+    concentration * 0.30 +
+    coverage * 0.30 +
+    coherence * 0.25 +
+    focusRatio * 0.15
   ) * 100;
 
   return Math.round(Math.max(0, Math.min(100, score)));

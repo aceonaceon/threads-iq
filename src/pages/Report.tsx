@@ -16,9 +16,22 @@ export default function Report() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const analyses = JSON.parse(localStorage.getItem('threadsiq_analyses') || '[]');
-    const found = analyses.find((a: StoredAnalysis) => a.id === id);
-    setAnalysis(found || null);
+    // Search across all user storage keys for this analysis
+    let found: StoredAnalysis | null = null;
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('threadsiq_analyses')) {
+        try {
+          const analyses: StoredAnalysis[] = JSON.parse(localStorage.getItem(key) || '[]');
+          const match = analyses.find((a) => a.id === id);
+          if (match) {
+            found = match;
+            break;
+          }
+        } catch {}
+      }
+    }
+    setAnalysis(found);
     setLoading(false);
   }, [id]);
 

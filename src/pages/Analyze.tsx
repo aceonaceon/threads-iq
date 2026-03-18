@@ -89,12 +89,17 @@ export default function Analyze() {
       
       // Step 3: Get cluster info for topic analysis
       const clusters: { id: number; posts: string[] }[] = [];
-      for (let i = 0; i < clusterCount; i++) {
-        const clusterPostIndices = labels
-          .map((label, idx) => label === i ? idx : -1)
-          .filter(idx => idx !== -1);
-        const clusterPosts = clusterPostIndices.map(idx => validPosts[idx]);
-        clusters.push({ id: i, posts: clusterPosts });
+      if (clusterCount === 0) {
+        // Fallback: treat all posts as one cluster
+        clusters.push({ id: 0, posts: validPosts });
+      } else {
+        for (let i = 0; i < clusterCount; i++) {
+          const clusterPostIndices = labels
+            .map((label, idx) => label === i ? idx : -1)
+            .filter(idx => idx !== -1);
+          const clusterPosts = clusterPostIndices.map(idx => validPosts[idx]);
+          clusters.push({ id: i, posts: clusterPosts });
+        }
       }
       
       // Step 4: Get topic analysis from API
