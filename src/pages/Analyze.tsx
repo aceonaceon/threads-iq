@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import PostInput from '../components/PostInput';
 import { runAnalysis, getTopicAnalysisWithClusters, AnalysisResult } from '../lib/api';
@@ -16,6 +16,7 @@ function getAuthToken(): string | null {
 export default function Analyze() {
   const { user, isAuthenticated, login, refreshUser } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   
   const [posts, setPosts] = useState<string[]>(['', '', '', '', '']);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -26,6 +27,12 @@ export default function Analyze() {
   const [showBulkImport, setShowBulkImport] = useState(false);
   const [bulkText, setBulkText] = useState('');
   const [showUsageExceededModal, setShowUsageExceededModal] = useState(false);
+  
+  // Threads OAuth state
+  const [threadsConnected, setThreadsConnected] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState('');
+  const [threadsAuthMessage, setThreadsAuthMessage] = useState('');
 
   // Load user data on mount
   useEffect(() => {
@@ -45,8 +52,102 @@ export default function Analyze() {
             .catch(console.error);
         }
       });
+      
+      // Check Threads connection status
+      checkThreadsStatus();
     }
   }, [isAuthenticated, refreshUser]);
+
+  // Handle Threads OAuth callback messages
+  useEffect(() => {
+    const authStatus = searchParams.get('threads_auth');
+    if (authStatus) {
+      if (authStatus === 'success') {
+        setThreadsConnected(true);
+        setThreadsAuthMessage('✅ Threads 帳號已連結成功！');
+        setTimeout(() => setThreadsAuthMessage(''), 5000);
+      } else if (authStatus === 'error') {
+        setThreadsAuthMessage('❌ Threads 連結失敗，請稍後再試');
+        setTimeout(() => setThreadsAuthMessage(''), 5000);
+      }
+      // Clean up URL
+      window.history.replaceState(null, '', '/analyze');
+    }
+  }, [searchParams]);
+
+  // Check Threads connection status
+  const checkThreadsStatus = async () => {
+    const token = getAuthToken();
+    if (!token) return;
+    
+    try {
+      const res = await fetch('/api/threads/status', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      setThreadsConnected(data.connected || false);
+    } catch (e) {
+      console.error('Failed to check threads status:', e);
+    }
+  };
+
+  // Connect to Threads (trigger OAuth flow)
+  const connectThreads = () => {
+    const lineToken = localStorage.getItem('threadsiq_token');
+    if (!lineToken) return;
+    window.location.href = `/api/auth/threads/login?token=${encodeURIComponent(lineToken)}`;
+  };
+
+  // Auto-import posts from Threads
+  const importFromThreads = async () => {
+    const token = getAuthToken();
+    if (!token) return;
+    
+    setIsImporting(true);
+    setImportProgress('正在取得你的 Threads 貼文...');
+    
+    try {
+      const res = await fetch('/api/threads/import', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      
+      const data = await res.json();
+      
+      if (!res.ok) {
+        if (data.error === 'threads_not_connected') {
+          setThreadsAuthMessage('請先連結 Threads 帳號');
+          connectThreads();
+          return;
+        }
+        throw new Error(data.error || 'import_failed');
+      }
+      
+      if (data.posts && data.posts.length > 0) {
+        setImportProgress(`已取得 ${data.count} 篇貼文，正在處理...`);
+        
+        // Extract text from posts
+        const importedPosts = data.posts
+          .map((p: any) => p.text)
+          .filter((t: string) => t && t.trim().length > 0);
+        
+        if (importedPosts.length >= MIN_POSTS) {
+          setPosts(importedPosts.slice(0, MAX_POSTS));
+          setImportProgress(`✅ 成功匯入 ${importedPosts.length} 篇貼文！`);
+        } else {
+          setImportProgress(`⚠️ 只取得 ${importedPosts.length} 篇文字貼文，至少需要 ${MIN_POSTS} 篇`);
+        }
+      } else {
+        setImportProgress('⚠️ 沒有找到任何貼文，請確認你的 Threads 帳號有公開貼文');
+      }
+    } catch (e: any) {
+      console.error('Import failed:', e);
+      setImportProgress('❌ 匯入失敗，請稍後再試');
+    } finally {
+      setIsImporting(false);
+      setTimeout(() => setImportProgress(''), 5000);
+    }
+  };
 
   const totalRemaining = weeklyRemaining + bonusRemaining;
 
@@ -260,6 +361,68 @@ export default function Analyze() {
               {showBulkImport ? '← 逐篇輸入' : '📋 批量匯入'}
             </button>
           </div>
+
+          {/* Threads OAuth Section */}
+          {isAuthenticated && user && (
+            <div className="bg-surface rounded-xl p-6 mb-8 border border-gray-800">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="text-2xl">🧵</div>
+                  <div>
+                    <h3 className="text-lg font-semibold">Threads 自動匯入</h3>
+                    <p className="text-gray-500 text-sm">
+                      {threadsConnected 
+                        ? '已連結 Threads 帳號，一鍵匯入所有貼文' 
+                        : '連結你的 Threads 帳號，自動匯入貼文'}
+                    </p>
+                  </div>
+                </div>
+                
+                {!threadsConnected ? (
+                  <button
+                    onClick={connectThreads}
+                    className="px-4 py-2 bg-[#1877F2] hover:bg-[#1861CB] text-white font-medium rounded-lg transition-colors flex items-center gap-2"
+                  >
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M12 2C6.477 2 2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.879V14.89h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.989C18.343 21.129 22 16.99 22 12c0-5.523-4.477-10-10-10z"/>
+                    </svg>
+                    連結 Threads
+                  </button>
+                ) : (
+                  <button
+                    onClick={importFromThreads}
+                    disabled={isImporting}
+                    className="px-4 py-2 bg-accent hover:bg-accent-hover text-white font-medium rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isImporting ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        匯入中...
+                      </>
+                    ) : (
+                      <>
+                        ⚡ 自動匯入
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+              
+              {/* Import progress/status message */}
+              {importProgress && (
+                <div className={`text-sm ${importProgress.includes('✅') ? 'text-green-400' : importProgress.includes('❌') ? 'text-red-400' : 'text-gray-400'}`}>
+                  {importProgress}
+                </div>
+              )}
+              
+              {/* Threads auth message */}
+              {threadsAuthMessage && (
+                <div className={`text-sm ${threadsAuthMessage.includes('✅') ? 'text-green-400' : 'text-red-400'}`}>
+                  {threadsAuthMessage}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Bulk import panel */}
           {showBulkImport && (

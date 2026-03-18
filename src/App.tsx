@@ -7,6 +7,8 @@ import Report from './pages/Report';
 import History from './pages/History';
 import Login from './pages/Login';
 import Affiliate from './pages/Affiliate';
+import ThreadGenerator from './pages/ThreadGenerator';
+import DraftCheck from './pages/DraftCheck';
 import { AuthProvider, useAuth } from './lib/auth';
 
 // Auth success handler component
@@ -94,6 +96,22 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Affiliate />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/thread-generator" 
+        element={
+          <ProtectedRoute>
+            <ThreadGenerator />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/draft-check" 
+        element={
+          <ProtectedRoute>
+            <DraftCheck />
           </ProtectedRoute>
         } 
       />

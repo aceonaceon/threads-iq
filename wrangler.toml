@@ -6,6 +6,8 @@ pages_build_output_dir = "./dist"
 ENV = "production"
 LINE_CHANNEL_ID = "2009518859"
 LINE_CHANNEL_SECRET = "9ce3693d7082b66c4ba59fe4e04bdf72"
+META_APP_ID = ""  
+META_APP_SECRET = ""
 
 [[kv_namespaces]]
 binding = "THREADSIQ_STORE"

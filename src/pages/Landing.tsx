@@ -425,7 +425,127 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Section 8: FAQ */}
+      {/* Section 8: 定價方案 */}
+      <section className="py-20 px-4">
+        <div className="max-w-5xl mx-auto">
+          <h2 className="text-3xl font-bold text-center mb-4">選擇你的方案</h2>
+          <p className="text-gray-400 text-center mb-12 text-sm">
+            目前語意分析功能完全免費開放。進階功能陸續上線中。
+          </p>
+
+          <div className="grid md:grid-cols-3 gap-6 items-start">
+            {/* 免費帳號 */}
+            <div className="bg-surface rounded-2xl p-6 border border-white/10 flex flex-col">
+              <div className="mb-6">
+                <div className="text-gray-400 text-sm font-medium mb-1">免費帳號</div>
+                <div className="flex items-end gap-1">
+                  <span className="text-5xl font-black text-white">$0</span>
+                  <span className="text-gray-500 mb-2">/月</span>
+                </div>
+                <p className="text-gray-500 text-sm mt-1">體驗語意分析</p>
+              </div>
+              <ul className="space-y-3 text-sm flex-1 mb-6">
+                <li className="flex items-start gap-2"><span className="text-green-400 mt-0.5">✅</span><span className="text-gray-300">每月 3 次分析</span></li>
+                <li className="flex items-start gap-2"><span className="text-green-400 mt-0.5">✅</span><span className="text-gray-300">手動貼文輸入（最多 10 篇）</span></li>
+                <li className="flex items-start gap-2"><span className="text-green-400 mt-0.5">✅</span><span className="text-gray-300">健康分數</span></li>
+                <li className="flex items-start gap-2"><span className="text-green-400 mt-0.5">✅</span><span className="text-gray-300">語意集群分析（基本版）</span></li>
+                <li className="flex items-start gap-2"><span className="text-green-400 mt-0.5">✅</span><span className="text-gray-300">偏離貼文偵測</span></li>
+                <li className="flex items-start gap-2"><span className="text-green-400 mt-0.5">✅</span><span className="text-gray-300">下一篇 AI 建議</span></li>
+                <li className="flex items-start gap-2"><span className="text-green-400 mt-0.5">✅</span><span className="text-gray-300">歷史紀錄（最近 3 次）</span></li>
+                <li className="flex items-start gap-2"><span className="text-gray-600 mt-0.5">—</span><span className="text-gray-500">自動抓文</span></li>
+                <li className="flex items-start gap-2"><span className="text-gray-600 mt-0.5">—</span><span className="text-gray-500">發文前語意評分</span></li>
+                <li className="flex items-start gap-2"><span className="text-gray-600 mt-0.5">—</span><span className="text-gray-500">串文複利引擎</span></li>
+                <li className="flex items-start gap-2"><span className="text-gray-600 mt-0.5">—</span><span className="text-gray-500">排程與自動化功能</span></li>
+              </ul>
+              {user ? (
+                <Link to="/analyze" className="block w-full text-center py-3 rounded-xl border border-white/20 text-gray-300 hover:border-white/40 hover:text-white transition-colors text-sm font-semibold">
+                  立即開始
+                </Link>
+              ) : (
+                <button onClick={handleAnalyze} className="block w-full text-center py-3 rounded-xl border border-white/20 text-gray-300 hover:border-white/40 hover:text-white transition-colors text-sm font-semibold">
+                  立即開始
+                </button>
+              )}
+            </div>
+
+            {/* 進階帳號（Highlight） */}
+            <div className="bg-surface rounded-2xl p-6 border-2 border-accent relative flex flex-col ring-2 ring-accent/30">
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                <span className="bg-accent text-background text-xs font-bold px-3 py-1 rounded-full">最受歡迎</span>
+              </div>
+              <div className="mb-6">
+                <div className="text-accent text-sm font-medium mb-1">進階帳號</div>
+                <div className="flex items-end gap-1">
+                  <span className="text-5xl font-black text-white">$12</span>
+                  <span className="text-gray-500 mb-2">/月</span>
+                </div>
+                <p className="text-accent text-sm mt-1">幫你寫對的內容</p>
+              </div>
+              <ul className="space-y-3 text-sm flex-1 mb-6">
+                <li className="flex items-start gap-2"><span className="text-green-400 mt-0.5">✅</span><span className="text-gray-300">無限次語意分析</span></li>
+                <li className="flex items-start gap-2"><span className="text-green-400 mt-0.5">✅</span><span className="text-gray-300">手動貼文輸入（最多 30 篇）</span></li>
+                <li className="flex items-start gap-2"><span className="text-green-400 mt-0.5">✅</span><span className="text-gray-300">健康分數</span></li>
+                <li className="flex items-start gap-2"><span className="text-green-400 mt-0.5">✅</span><span className="text-gray-300">語意集群分析（完整版）</span></li>
+                <li className="flex items-start gap-2"><span className="text-green-400 mt-0.5">✅</span><span className="text-gray-300">偏離貼文偵測</span></li>
+                <li className="flex items-start gap-2"><span className="text-green-400 mt-0.5">✅</span><span className="text-gray-300">下一篇 AI 建議</span></li>
+                <li className="flex items-start gap-2"><span className="text-green-400 mt-0.5">✅</span><span className="text-gray-300">歷史紀錄（無限）</span></li>
+                <li className="flex items-start gap-2"><span className="text-yellow-500 mt-0.5">🔧</span><span className="text-gray-300">Threads OAuth 自動抓文 <span className="text-gray-500 text-xs">開發中</span></span></li>
+                <li className="flex items-start gap-2"><span className="text-yellow-500 mt-0.5">🔧</span><span className="text-gray-300">發文前語意評分 <span className="text-gray-500 text-xs">開發中</span></span></li>
+                <li className="flex items-start gap-2"><span className="text-yellow-500 mt-0.5">🔧</span><span className="text-gray-300">內容蠶食偵測 <span className="text-gray-500 text-xs">開發中</span></span></li>
+                <li className="flex items-start gap-2"><span className="text-yellow-500 mt-0.5">🔧</span><span className="text-gray-300">Hook 格式評分 <span className="text-gray-500 text-xs">開發中</span></span></li>
+                <li className="flex items-start gap-2"><span className="text-yellow-500 mt-0.5">🔧</span><span className="text-gray-300">串文複利引擎 <span className="text-gray-500 text-xs">開發中</span></span></li>
+                <li className="flex items-start gap-2"><span className="text-gray-600 mt-0.5">—</span><span className="text-gray-500">排程與自動化功能</span></li>
+              </ul>
+              {user ? (
+                <Link to="/analyze" className="block w-full text-center py-3 rounded-xl bg-cta hover:bg-cta-hover text-white transition-colors text-sm font-semibold">
+                  立即升級
+                </Link>
+              ) : (
+                <button onClick={handleAnalyze} className="block w-full text-center py-3 rounded-xl bg-cta hover:bg-cta-hover text-white transition-colors text-sm font-semibold">
+                  立即升級
+                </button>
+              )}
+            </div>
+
+            {/* Pro 帳號 */}
+            <div className="bg-surface rounded-2xl p-6 border border-white/10 flex flex-col">
+              <div className="mb-6">
+                <div className="text-gray-400 text-sm font-medium mb-1">Pro 帳號</div>
+                <div className="flex items-end gap-1">
+                  <span className="text-5xl font-black text-white">$29</span>
+                  <span className="text-gray-500 mb-2">/月</span>
+                </div>
+                <p className="text-gray-300 text-sm mt-1">幫你在對的時間發，發完還幫你顧</p>
+              </div>
+              <ul className="space-y-3 text-sm flex-1 mb-6">
+                <li className="flex items-start gap-2"><span className="text-green-400 mt-0.5">✅</span><span className="text-gray-300">包含所有進階功能</span></li>
+                <li className="pt-2 pb-1"><span className="text-gray-500 text-xs font-medium uppercase tracking-wider">自動化功能（開發中）</span></li>
+                <li className="flex items-start gap-2"><span className="text-yellow-500 mt-0.5">🔧</span><span className="text-gray-300">排程發文 <span className="text-gray-500 text-xs">開發中</span></span></li>
+                <li className="flex items-start gap-2"><span className="text-yellow-500 mt-0.5">🔧</span><span className="text-gray-300">主題輪替管家 <span className="text-gray-500 text-xs">開發中</span></span></li>
+                <li className="flex items-start gap-2"><span className="text-yellow-500 mt-0.5">🔧</span><span className="text-gray-300">黃金窗口偵測 <span className="text-gray-500 text-xs">開發中</span></span></li>
+                <li className="flex items-start gap-2"><span className="text-yellow-500 mt-0.5">🔧</span><span className="text-gray-300">爆文 48h 行動計畫 <span className="text-gray-500 text-xs">開發中</span></span></li>
+                <li className="flex items-start gap-2"><span className="text-yellow-500 mt-0.5">🔧</span><span className="text-gray-300">語意衰變週報 <span className="text-gray-500 text-xs">開發中</span></span></li>
+                <li className="flex items-start gap-2"><span className="text-yellow-500 mt-0.5">🔧</span><span className="text-gray-300">AI 回覆建議 <span className="text-gray-500 text-xs">開發中</span></span></li>
+              </ul>
+              {user ? (
+                <Link to="/analyze" className="block w-full text-center py-3 rounded-xl bg-cta hover:bg-cta-hover text-white transition-colors text-sm font-semibold">
+                  立即升級
+                </Link>
+              ) : (
+                <button onClick={handleAnalyze} className="block w-full text-center py-3 rounded-xl bg-cta hover:bg-cta-hover text-white transition-colors text-sm font-semibold">
+                  立即升級
+                </button>
+              )}
+            </div>
+          </div>
+
+          <p className="text-center text-gray-500 text-xs mt-8">
+            🔧 開發中：標記此符號的功能正在積極開發中，Pro 會員將在功能上線後優先免費解鎖。
+          </p>
+        </div>
+      </section>
+
+      {/* Section 9: FAQ */}
       <section className="py-20 px-4 bg-surface/30">
         <div className="max-w-3xl mx-auto">
           <h2 className="text-3xl font-bold text-center mb-12">
@@ -479,14 +599,83 @@ export default function Landing() {
                 Q: 收費嗎？
               </h3>
               <p className="text-gray-400 text-sm">
-                目前完全免費。不需要信用卡，不需要帳號，直接開始分析。
+                目前的語意分析功能（健康分數、集群分析、AI 建議）<strong className="text-white">完全免費</strong>，每月 3 次。<br /><br />
+                進階帳號（$12/月）提供無限次分析 + 自動抓文、發文前評分、串文引擎等內容優化工具。<br /><br />
+                Pro 帳號（$29/月）在進階功能基礎上增加排程發文、黃金窗口偵測、爆文追蹤、語意週報等自動化功能，目前正積極開發中，Pro 會員將優先免費解鎖。<br /><br />
+                不需要信用卡即可開始使用免費版。
+              </p>
+            </div>
+
+            {/* FAQ 6 */}
+            <div className="bg-surface rounded-xl p-6 border border-white/5">
+              <h3 className="text-lg font-semibold mb-3 text-white">
+                Q: 什麼是「語意身份」？
+              </h3>
+              <p className="text-gray-400 text-sm">
+                語意身份（Creator Embedding）是 Threads AI 系統對你帳號的「理解結果」。
+                <br /><br />
+                系統會把你每篇貼文轉換成高維度的數學向量（Embedding），再把這些向量平均成一個代表你帳號整體語意方向的「中心向量」。這個中心向量，就是你的語意身份——它決定了你的貼文會被推送給哪種受眾、在哪個話題群集裡競爭曝光。
+                <br /><br />
+                簡單說：語意身份就是「Threads AI 在你每次發文前，對你帳號做的第一個判斷」。
+              </p>
+            </div>
+
+            {/* FAQ 7 */}
+            <div className="bg-surface rounded-xl p-6 border border-white/5">
+              <h3 className="text-lg font-semibold mb-3 text-white">
+                Q: 為什麼語意身份對創作者很重要？
+              </h3>
+              <p className="text-gray-400 text-sm">
+                Threads AI 的推薦邏輯是：先判斷你是誰，再決定把你的貼文推給誰。
+                <br /><br />
+                語意身份清晰的帳號，每篇新貼文會進入精準的受眾池，初始推送的互動率更高，觸及才能持續擴大。
+                <br /><br />
+                語意身份模糊的帳號——例如今天發留學文、明天發加密貨幣、後天發親子育兒——系統不知道你的受眾是誰，只能隨機推送。結果就是：你的每篇文都像在從零開始，累積不了受眾信任。
+                <br /><br />
+                ThreadsIQ 做的事，就是把你「在 AI 眼中的語意身份」可視化，讓你第一次看清楚自己的帳號定位究竟長什麼樣。
+              </p>
+            </div>
+
+            {/* FAQ 8 */}
+            <div className="bg-surface rounded-xl p-6 border border-white/5">
+              <h3 className="text-lg font-semibold mb-3 text-white">
+                Q: 我就是想隨便發文，不行嗎？
+              </h3>
+              <p className="text-gray-400 text-sm">
+                當然可以！但你要先知道代價是什麼。
+                <br /><br />
+                根據 Meta 的內容多樣性專利（US9336553B2），系統會主動偵測你的貼文相似度，並在你連續發相似主題時，對後面的文章降低排名——這是為了讓 Feed 不要太單調。
+                <br /><br />
+                但同樣地，如果你的帳號主題太分散，演算法就很難建立對你的受眾預測模型，每篇文的初始推送池都會偏小。
+                <br /><br />
+                所以隨便發文不是不行，只是要接受：觸及會起伏不定，很難累積出穩定成長的受眾基礎。如果你對這個結果 OK，那完全沒問題。
+              </p>
+            </div>
+
+            {/* FAQ 9 */}
+            <div className="bg-surface rounded-xl p-6 border border-white/5">
+              <h3 className="text-lg font-semibold mb-3 text-white">
+                Q: Threads 真的有在用「語意身份」嗎？
+              </h3>
+              <p className="text-gray-400 text-sm">
+                Meta 從未直接公開「Creator Embedding」這個詞，但他們的演算法專利已清楚揭示背後的技術邏輯：
+                <br /><br />
+                ・<span className="font-mono text-accent">US10579688B2</span> — 語意向量推薦系統：Meta 申請了「把用戶查詢與內容物件分別轉換為高維度向量，再透過向量相似度計算相關性分數」的推薦專利。這就是 Creator Embedding 的技術基礎。
+                <br /><br />
+                ・<span className="font-mono text-accent">US10558714B2</span> — 主題群集 Content Feed：內容被自動分群到「主題群集」，系統偵測用戶對不同主題的興趣強度，並優先顯示最相關主題的高排名內容。
+                <br /><br />
+                ・<span className="font-mono text-accent">US20190095961A1</span> — ML 內容品質預測：系統用機器學習綜合評估用戶關係強度、內容特徵與歷史行為，對每篇貼文輸出品質分數——你的帳號歷史語意方向，是影響分數的關鍵輸入。
+                <br /><br />
+                ・Meta 透明度中心（2026）官方聲明：「The content on your Threads feed is selected, ranked, and delivered by an AI system. Within one AI system, multiple machine learning models work together.」
+                <br /><br />
+                這些專利和聲明合起來說明：Threads 的 AI 系統確實在做語意層面的帳號辨識與受眾匹配，只是 Meta 沒有用「Creator Embedding」這個詞來公開描述它。
               </p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Section 9: Final CTA */}
+      {/* Section 10: Final CTA */}
       <section className="py-20 px-4 bg-gradient-to-b from-surface to-background">
         <div className="max-w-2xl mx-auto text-center">
           <h2 className="text-3xl md:text-4xl font-bold mb-6">

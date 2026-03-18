@@ -12,6 +12,8 @@ export default function Navbar() {
 
   const navLinks = isAuthenticated ? [
     { path: '/analyze', label: '分析' },
+    { path: '/draft-check', label: '發文前檢查' },
+    { path: '/thread-generator', label: '串文引擎' },
     { path: '/history', label: '歷史記錄' },
     { path: '/affiliate', label: '推薦計畫' },
   ] : [];
