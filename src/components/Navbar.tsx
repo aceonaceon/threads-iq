@@ -2,7 +2,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 
 export default function Navbar() {
-  const { user, logout, loginAsGuest } = useAuth();
+  const { user, isAuthenticated, logout, login } = useAuth();
   const location = useLocation();
 
   const isActive = (path: string) => location.pathname === path;
@@ -15,7 +15,7 @@ export default function Navbar() {
         </Link>
 
         <div className="flex items-center gap-6">
-          {user && (
+          {isAuthenticated && (
             <>
               <Link
                 to="/analyze"
@@ -36,11 +36,20 @@ export default function Navbar() {
             </>
           )}
 
-          {user ? (
+          {isAuthenticated && user ? (
             <div className="flex items-center gap-3">
-              <span className="text-sm text-gray-400">
-                {user.name || user.email}
-              </span>
+              {user.avatarUrl ? (
+                <img 
+                  src={user.avatarUrl} 
+                  alt={user.name}
+                  className="w-8 h-8 rounded-full"
+                />
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-accent flex items-center justify-center text-white text-sm font-medium">
+                  {user.name.charAt(0)}
+                </div>
+              )}
+              <span className="text-sm text-gray-400">{user.name}</span>
               <button
                 onClick={logout}
                 className="text-sm text-gray-500 hover:text-white transition-colors"
@@ -50,8 +59,8 @@ export default function Navbar() {
             </div>
           ) : (
             <button
-              onClick={loginAsGuest}
-              className="px-4 py-2 bg-accent hover:bg-accent-hover text-white text-sm font-medium rounded-lg transition-colors"
+              onClick={login}
+              className="px-4 py-2 bg-cta hover:bg-cta-hover text-white text-sm font-medium rounded-lg transition-colors"
             >
               開始使用
             </button>

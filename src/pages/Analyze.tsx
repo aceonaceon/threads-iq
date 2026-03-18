@@ -9,8 +9,12 @@ const MIN_POSTS = 5;
 const MAX_POSTS = 30;
 const MAX_FREE_USES = 3;
 
+function getAuthToken(): string | null {
+  return localStorage.getItem('threadsiq_token');
+}
+
 export default function Analyze() {
-  const { user, loginAsGuest } = useAuth();
+  const { user, isAuthenticated, login, refreshUser } = useAuth();
   const navigate = useNavigate();
   
   const [posts, setPosts] = useState<string[]>(['', '', '', '', '']);
@@ -21,20 +25,32 @@ export default function Analyze() {
   const [showBulkImport, setShowBulkImport] = useState(false);
   const [bulkText, setBulkText] = useState('');
 
+  // Load user data on mount
   useEffect(() => {
-    if (!user) {
-      loginAsGuest();
+    if (isAuthenticated) {
+      refreshUser().then(() => {
+        // Get remaining uses from auth
+        const token = getAuthToken();
+        if (token) {
+          fetch('/api/auth/me', {
+            headers: { Authorization: `Bearer ${token}` },
+          })
+            .then(res => res.json())
+            .then(data => {
+              setRemainingUses(data.remainingUses ?? MAX_FREE_USES);
+            })
+            .catch(console.error);
+        }
+      });
     }
-  }, [user, loginAsGuest]);
+  }, [isAuthenticated, refreshUser]);
 
-  // Load remaining uses from localStorage on mount
+  // Redirect if not authenticated
   useEffect(() => {
-    if (user) {
-      const stored = localStorage.getItem(`threadsiq_usage_${user.id}`);
-      const count = stored ? parseInt(stored, 10) : MAX_FREE_USES;
-      setRemainingUses(count);
+    if (!isAuthenticated && !user) {
+      // Don't auto-login as guest anymore
     }
-  }, [user]);
+  }, [isAuthenticated, user]);
 
   const validPosts = posts.filter(p => p.trim().length > 0);
 
@@ -72,7 +88,7 @@ export default function Analyze() {
   };
 
   const handleAnalyze = async () => {
-    if (!user || validPosts.length < MIN_POSTS) return;
+    if (!isAuthenticated || !user || validPosts.length < MIN_POSTS) return;
 
     setIsAnalyzing(true);
     setError('');
@@ -121,18 +137,28 @@ export default function Analyze() {
         },
       };
       
-      // Save to localStorage
-      const storageKey = `threadsiq_analyses_${user.id}`;
-      const existingAnalyses = JSON.parse(localStorage.getItem(storageKey) || '[]');
-      existingAnalyses.unshift({
-        id: result.id,
-        posts: validPosts,
-        result: analysisResult,
-        createdAt: new Date().toISOString(),
-      });
-      localStorage.setItem(storageKey, JSON.stringify(existingAnalyses));
+      // Save to cloud
+      const token = getAuthToken();
+      if (token) {
+        const saveResponse = await fetch('/api/analyses/save', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            id: result.id,
+            posts: validPosts,
+            result: analysisResult,
+          }),
+        });
+        
+        if (saveResponse.ok) {
+          const saveData = await saveResponse.json();
+          setRemainingUses(saveData.remainingUses);
+        }
+      }
       
-      setRemainingUses(result.remainingUses);
       navigate(`/report/${result.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : '分析失敗，請稍後再試');
@@ -142,8 +168,28 @@ export default function Analyze() {
     }
   };
 
-  if (!user) {
-    return null;
+  // Not authenticated - show login prompt
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center px-4">
+        <div className="max-w-md w-full text-center">
+          <div className="text-4xl mb-4">🔐</div>
+          <h1 className="text-2xl font-bold mb-2">請先登入</h1>
+          <p className="text-gray-500 mb-6">
+            登入 LINE 帳號以使用分析功能
+          </p>
+          <button
+            onClick={login}
+            className="inline-flex items-center gap-2 px-6 py-3 bg-[#06C755] hover:bg-[#05B54C] text-white font-medium rounded-xl transition-colors"
+          >
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="white">
+              <path d="M12 2C6.477 2 2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.879V14.89h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.989C18.343 21.129 22 16.99 22 12c0-5.523-4.477-10-10-10z"/>
+            </svg>
+            LINE 登入
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (

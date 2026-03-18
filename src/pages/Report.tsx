@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { useAuth } from '../lib/auth';
 import AnalysisReport from '../components/AnalysisReport';
 import type { AnalysisResult } from '../lib/api';
 
@@ -12,28 +13,58 @@ interface StoredAnalysis {
 
 export default function Report() {
   const { id } = useParams<{ id: string }>();
+  const { isAuthenticated } = useAuth();
   const [analysis, setAnalysis] = useState<StoredAnalysis | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    // Search across all user storage keys for this analysis
-    let found: StoredAnalysis | null = null;
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith('threadsiq_analyses')) {
-        try {
-          const analyses: StoredAnalysis[] = JSON.parse(localStorage.getItem(key) || '[]');
-          const match = analyses.find((a) => a.id === id);
-          if (match) {
-            found = match;
-            break;
-          }
-        } catch {}
-      }
+    if (!isAuthenticated || !id) {
+      setLoading(false);
+      return;
     }
-    setAnalysis(found);
-    setLoading(false);
-  }, [id]);
+
+    const token = localStorage.getItem('threadsiq_token');
+    fetch(`/api/analyses/${id}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    })
+      .then(res => {
+        if (!res.ok) {
+          throw new Error('找不到分析報告');
+        }
+        return res.json();
+      })
+      .then(data => {
+        setAnalysis({
+          id: data.id,
+          posts: data.posts,
+          result: data.result,
+          createdAt: data.createdAt,
+        });
+        setLoading(false);
+      })
+      .catch(err => {
+        setError(err.message || '載入失敗');
+        setLoading(false);
+      });
+  }, [id, isAuthenticated]);
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-[calc(100vh-4rem)] flex flex-col items-center justify-center px-4">
+        <h1 className="text-2xl font-bold mb-4">請先登入</h1>
+        <p className="text-gray-500 mb-6">登入後才能查看分析報告</p>
+        <Link
+          to="/login"
+          className="px-6 py-3 bg-accent hover:bg-accent-hover text-white font-medium rounded-xl transition-colors"
+        >
+          登入
+        </Link>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -43,7 +74,7 @@ export default function Report() {
     );
   }
 
-  if (!analysis) {
+  if (error || !analysis) {
     return (
       <div className="min-h-[calc(100vh-4rem)] flex flex-col items-center justify-center px-4">
         <h1 className="text-2xl font-bold mb-4">找不到分析報告</h1>

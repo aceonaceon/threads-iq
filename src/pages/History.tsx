@@ -1,30 +1,43 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
-import type { AnalysisResult } from '../lib/api';
 
-interface StoredAnalysis {
+interface HistoryItem {
   id: string;
-  posts: string[];
-  result: AnalysisResult;
+  postCount: number;
+  clusterCount: number;
+  healthScore: number;
   createdAt: string;
 }
 
 export default function History() {
-  const { user } = useAuth();
-  const [analyses, setAnalyses] = useState<StoredAnalysis[]>([]);
+  const { isAuthenticated } = useAuth();
+  const [analyses, setAnalyses] = useState<HistoryItem[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (user) {
-      const stored = JSON.parse(localStorage.getItem(`threadsiq_analyses_${user.id}`) || '[]');
-      setAnalyses(stored);
+    if (isAuthenticated) {
+      const token = localStorage.getItem('threadsiq_token');
+      fetch('/api/analyses/list', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+        .then(res => res.json())
+        .then(data => {
+          setAnalyses(data);
+          setLoading(false);
+        })
+        .catch(err => {
+          console.error('Failed to load analyses:', err);
+          setLoading(false);
+        });
     }
-  }, [user]);
+  }, [isAuthenticated]);
 
-  const clearHistory = () => {
-    if (user && confirm('確定要清除所有歷史紀錄？')) {
-      localStorage.removeItem(`threadsiq_analyses_${user.id}`);
-      localStorage.removeItem(`threadsiq_usage_${user.id}`);
+  const clearHistory = async () => {
+    if (confirm('確定要清除所有歷史紀錄？')) {
+      // Note: We don't have a delete endpoint, so we just clear local state
       setAnalyses([]);
     }
   };
@@ -45,7 +58,7 @@ export default function History() {
     });
   };
 
-  if (!user) {
+  if (!isAuthenticated) {
     return (
       <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center">
         <div className="text-center">
@@ -57,6 +70,14 @@ export default function History() {
             登入
           </Link>
         </div>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -106,7 +127,7 @@ export default function History() {
               <h3 className="text-sm font-medium text-gray-400 mb-4">健康分數趨勢</h3>
               <div className="flex items-end gap-2 h-24">
                 {analyses.slice(0, 10).reverse().map((a) => {
-                  const score = a.result.topicAnalysis.healthScore;
+                  const score = a.healthScore;
                   const height = (score / 100) * 80;
                   return (
                     <div
@@ -126,10 +147,7 @@ export default function History() {
 
             {/* Analysis list */}
             {analyses.map((analysis) => {
-              const { id, posts, result, createdAt } = analysis;
-              const { healthScore, clusters } = result.topicAnalysis;
-              const postCount = posts.length;
-              const clusterCount = clusters.length;
+              const { id, postCount, clusterCount, healthScore, createdAt } = analysis;
 
               return (
                 <Link

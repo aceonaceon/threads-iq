@@ -2,61 +2,126 @@ import { createContext, useContext, useState, useEffect, ReactNode } from 'react
 
 interface User {
   id: string;
-  email: string;
-  name?: string;
+  name: string;
   avatarUrl?: string;
+  usageCount: number;
+  remainingUses: number;
 }
 
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
+  isAuthenticated: boolean;
   login: () => void;
-  loginAsGuest: () => void;
   logout: () => void;
+  checkAuth: () => Promise<void>;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
+
+const API_BASE = '';
+
+function getStoredToken(): string | null {
+  return localStorage.getItem('threadsiq_token');
+}
+
+function storeToken(token: string): void {
+  localStorage.setItem('threadsiq_token', token);
+}
+
+function clearToken(): void {
+  localStorage.removeItem('threadsiq_token');
+}
+
+function getTokenFromUrl(): string | null {
+  const hash = window.location.hash;
+  if (hash && hash.includes('token=')) {
+    const token = hash.split('token=')[1]?.split('&')[0];
+    if (token) {
+      // Clear the hash after extracting token
+      window.history.replaceState(null, '', window.location.pathname);
+      return decodeURIComponent(token);
+    }
+  }
+  return null;
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    // Check for existing session
-    const stored = localStorage.getItem('threadsiq_user');
-    if (stored) {
-      try {
-        setUser(JSON.parse(stored));
-      } catch {
-        localStorage.removeItem('threadsiq_user');
-      }
+  const checkAuth = async () => {
+    const token = getStoredToken();
+    if (!token) {
+      setIsLoading(false);
+      return;
     }
-    setIsLoading(false);
+
+    try {
+      const response = await fetch(`${API_BASE}/api/auth/me`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const userData = await response.json();
+        setUser({
+          id: userData.userId,
+          name: userData.displayName,
+          avatarUrl: userData.pictureUrl,
+          usageCount: userData.usageCount || 0,
+          remainingUses: userData.remainingUses,
+        });
+      } else {
+        clearToken();
+      }
+    } catch (error) {
+      console.error('Auth check failed:', error);
+      clearToken();
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const refreshUser = async () => {
+    await checkAuth();
+  };
+
+  useEffect(() => {
+    // Check for token in URL first (from OAuth callback)
+    const urlToken = getTokenFromUrl();
+    if (urlToken) {
+      storeToken(urlToken);
+      // Clear the hash
+      window.location.hash = '';
+    }
+    
+    // Then check stored token
+    checkAuth();
   }, []);
 
   const login = () => {
-    // TODO: Replace with real Google OAuth
-    // For now, redirect to login page which has guest option
-    window.location.href = '/login';
-  };
-
-  const loginAsGuest = () => {
-    const guestUser: User = {
-      id: `guest_${Date.now()}`,
-      email: 'guest@threads-iq.local',
-      name: '訪客',
-    };
-    setUser(guestUser);
-    localStorage.setItem('threadsiq_user', JSON.stringify(guestUser));
+    window.location.href = '/api/auth/login';
   };
 
   const logout = () => {
+    clearToken();
     setUser(null);
-    localStorage.removeItem('threadsiq_user');
+    window.location.href = '/';
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, loginAsGuest, logout }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      isLoading, 
+      isAuthenticated: !!user,
+      login, 
+      logout,
+      checkAuth,
+      refreshUser,
+    }}>
       {children}
     </AuthContext.Provider>
   );

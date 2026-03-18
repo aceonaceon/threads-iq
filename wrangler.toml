@@ -4,3 +4,9 @@ pages_build_output_dir = "./dist"
 
 [vars]
 ENV = "production"
+LINE_CHANNEL_ID = "2009518859"
+LINE_CHANNEL_SECRET = "9ce3693d7082b66c4ba59fe4e04bdf72"
+
+[[kv_namespaces]]
+binding = "THREADSIQ_STORE"
+id = "a5ce9c7ba11149f99c2cfe3ec63f1a8b"
