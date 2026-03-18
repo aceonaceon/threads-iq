@@ -28,6 +28,7 @@ export interface AnalysisResult {
   labels: number[];
   topicAnalysis: TopicAnalysis;
   remainingUses: number;
+  bonusRemaining: number;
 }
 
 export interface HistoryItem {
@@ -40,7 +41,7 @@ export interface HistoryItem {
 }
 
 // Call the /api/analyze endpoint to get real embeddings
-async function getEmbeddings(posts: string[]): Promise<number[][]> {
+async function getEmbeddings(posts: string[]): Promise<{ embeddings: number[][]; remaining: number; bonusRemaining: number }> {
   const response = await fetch('/api/analyze', {
     method: 'POST',
     headers: {
@@ -51,11 +52,15 @@ async function getEmbeddings(posts: string[]): Promise<number[][]> {
 
   if (!response.ok) {
     const error = await response.json();
+    // Check if this is a usage exceeded error
+    if (response.status === 403 || error.error === 'usage_exceeded') {
+      throw new Error('usage_exceeded');
+    }
     throw new Error(error.error || '取得語意嵌入失敗');
   }
 
-  const data = await response.json() as { embeddings: number[][] };
-  return data.embeddings;
+  const data = await response.json() as { embeddings: number[][]; remaining: number; bonusRemaining: number };
+  return data;
 }
 
 // Call the /api/topics endpoint to get real topic analysis
@@ -86,25 +91,12 @@ function getUsageCount(userId: string): number {
   return stored ? parseInt(stored, 10) : 3;
 }
 
-// Save usage count to localStorage
-function saveUsageCount(userId: string, count: number): void {
-  const key = `threadsiq_usage_${userId}`;
-  localStorage.setItem(key, count.toString());
-}
-
-export async function runAnalysis(posts: string[], userId: string): Promise<AnalysisResult> {
-  // Check remaining uses
-  const remainingUses = getUsageCount(userId);
-  
+export async function runAnalysis(posts: string[], _userId: string): Promise<AnalysisResult> {
   // Generate unique analysis ID
   const analysisId = uuidv4();
 
-  // Step 1: Get embeddings from API
-  const embeddings = await getEmbeddings(posts);
-
-  // Decrement usage count
-  const newRemainingUses = Math.max(0, remainingUses - 1);
-  saveUsageCount(userId, newRemainingUses);
+  // Step 1: Get embeddings from API (includes usage check and consumption)
+  const { embeddings, remaining, bonusRemaining } = await getEmbeddings(posts);
 
   return {
     id: analysisId,
@@ -118,7 +110,8 @@ export async function runAnalysis(posts: string[], userId: string): Promise<Anal
       nextPostSuggestions: [],
       recommendations: [],
     },
-    remainingUses: newRemainingUses,
+    remainingUses: remaining,
+    bonusRemaining,
   };
 }
 

@@ -7,6 +7,9 @@ export default function Navbar() {
 
   const isActive = (path: string) => location.pathname === path;
 
+  // Calculate total remaining uses
+  const totalRemaining = user ? (user.weeklyRemaining || 0) + (user.bonusUses || 0) : 0;
+
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-surface/95 backdrop-blur-sm border-b border-white/5">
       <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
@@ -33,11 +36,24 @@ export default function Navbar() {
               >
                 歷史記錄
               </Link>
+              <Link
+                to="/affiliate"
+                className={`text-sm font-medium transition-colors ${
+                  isActive('/affiliate') ? 'text-accent' : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                推薦計畫
+              </Link>
             </>
           )}
 
           {isAuthenticated && user ? (
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-4">
+              {/* Usage badge */}
+              <div className="text-xs text-gray-400 bg-gray-800/50 px-3 py-1.5 rounded-full">
+                剩餘 <span className="text-accent font-medium">{totalRemaining}</span> 次
+              </div>
+              
               {user.avatarUrl ? (
                 <img 
                   src={user.avatarUrl} 

@@ -7,15 +7,25 @@ interface Env {
 export const onRequestGet: PagesFunction<Env> = async (context) => {
   const { LINE_CHANNEL_ID } = context.env;
   const redirectUri = 'https://threads-iq.pages.dev/auth/callback';
-  const state = crypto.randomUUID();
   
-  const url = new URL('https://access.line.me/oauth2/v2.1/authorize');
-  url.searchParams.set('response_type', 'code');
-  url.searchParams.set('client_id', LINE_CHANNEL_ID);
-  url.searchParams.set('redirect_uri', redirectUri);
-  url.searchParams.set('state', state);
-  url.searchParams.set('scope', 'profile openid');
-  url.searchParams.set('bot_prompt', 'aggressive');
+  // Check for ref parameter from query string
+  const url = new URL(context.request.url);
+  const refCode = url.searchParams.get('ref');
   
-  return Response.redirect(url.toString(), 302);
+  // Generate state with optional ref code
+  const stateObj = {
+    csrf: crypto.randomUUID(),
+    ref: refCode || null,
+  };
+  const state = btoa(JSON.stringify(stateObj));
+  
+  const lineUrl = new URL('https://access.line.me/oauth2/v2.1/authorize');
+  lineUrl.searchParams.set('response_type', 'code');
+  lineUrl.searchParams.set('client_id', LINE_CHANNEL_ID);
+  lineUrl.searchParams.set('redirect_uri', redirectUri);
+  lineUrl.searchParams.set('state', state);
+  lineUrl.searchParams.set('scope', 'profile openid');
+  lineUrl.searchParams.set('bot_prompt', 'aggressive');
+  
+  return Response.redirect(lineUrl.toString(), 302);
 };

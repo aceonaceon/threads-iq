@@ -15,13 +15,35 @@ function base64Encode(str: string): string {
   return btoa(binary);
 }
 
+// Generate referral code from user ID + secret
+async function generateReferralCode(userId: string, secret: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(userId + secret);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  return hashHex.substring(0, 8);
+}
+
 export const onRequestGet: PagesFunction<Env> = async (context) => {
   try {
     const url = new URL(context.request.url);
     const code = url.searchParams.get('code');
+    const state = url.searchParams.get('state');
 
     if (!code) {
       return Response.redirect('https://threads-iq.pages.dev/login?error=no_code', 302);
+    }
+
+    // Decode state to get ref code
+    let refCode: string | null = null;
+    if (state) {
+      try {
+        const stateObj = JSON.parse(atob(state));
+        refCode = stateObj.ref || null;
+      } catch (e) {
+        console.error('Failed to parse state:', e);
+      }
     }
 
     // Exchange code for token (LINE requires client_id/secret in body, not Basic Auth)
@@ -64,18 +86,81 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
         displayName: profile.displayName || 'User',
         pictureUrl: profile.pictureUrl || '',
         createdAt: new Date().toISOString(),
-        usageCount: 0,
-        usageResetAt: new Date().toISOString(),
+        weeklyUses: 0,
+        weeklyResetAt: new Date().toISOString(),
+        bonusUses: 0,
+        referralCode: '',
+        referredBy: null,
+        totalReferrals: 0,
+        commissionBalance: 0,
+        isPaid: false,
       };
+
+      const isNewUser = !existingStr;
 
       if (existingStr) {
         const existing = JSON.parse(existingStr);
-        userData.usageCount = existing.usageCount || 0;
+        userData.weeklyUses = existing.weeklyUses || 0;
+        userData.weeklyResetAt = existing.weeklyResetAt || new Date().toISOString();
+        userData.bonusUses = existing.bonusUses || 0;
         userData.createdAt = existing.createdAt;
-        userData.usageResetAt = existing.usageResetAt || new Date().toISOString();
+        userData.referralCode = existing.referralCode || '';
+        userData.referredBy = existing.referredBy || null;
+        userData.totalReferrals = existing.totalReferrals || 0;
+        userData.commissionBalance = existing.commissionBalance || 0;
+        userData.isPaid = existing.isPaid || false;
+      }
+
+      // Generate referral code if new user or doesn't have one
+      if (!userData.referralCode) {
+        userData.referralCode = await generateReferralCode(profile.userId, context.env.LINE_CHANNEL_SECRET);
+      }
+
+      // Handle referral logic for new users
+      if (isNewUser && refCode) {
+        // Look up referrer by ref code
+        const referrerId = await context.env.THREADSIQ_STORE.get(`ref:${refCode}`);
+        
+        if (referrerId && referrerId !== profile.userId) {
+          // Set new user's referredBy and bonus
+          userData.referredBy = referrerId;
+          userData.bonusUses = (userData.bonusUses || 0) + 10;
+
+          // Update referrer's stats
+          const referrerStr = await context.env.THREADSIQ_STORE.get(`user:${referrerId}`);
+          if (referrerStr) {
+            const referrerData = JSON.parse(referrerStr);
+            referrerData.bonusUses = (referrerData.bonusUses || 0) + 10;
+            referrerData.totalReferrals = (referrerData.totalReferrals || 0) + 1;
+            
+            // Add to referrer's referral list
+            const referralListKey = `referrals:${referrerId}`;
+            const referralListStr = await context.env.THREADSIQ_STORE.get(referralListKey);
+            let referralList: any[] = [];
+            if (referralListStr) {
+              referralList = JSON.parse(referrerListStr);
+            }
+            referralList.push({
+              userId: profile.userId,
+              displayName: profile.displayName || 'User',
+              joinedAt: new Date().toISOString(),
+              isPaid: false,
+            });
+            
+            await context.env.THREADSIQ_STORE.put(referralListKey, JSON.stringify(referralList));
+            await context.env.THREADSIQ_STORE.put(`user:${referrerId}`, JSON.stringify(referrerData));
+          }
+
+          console.log(`Referral applied: ${refCode} -> ${profile.userId}`);
+        }
       }
 
       await context.env.THREADSIQ_STORE.put(`user:${profile.userId}`, JSON.stringify(userData));
+
+      // Store ref lookup for the user
+      if (userData.referralCode) {
+        await context.env.THREADSIQ_STORE.put(`ref:${userData.referralCode}`, profile.userId);
+      }
     } catch (kvError) {
       // KV might not be bound yet, continue without saving
       console.error('KV error (non-fatal):', kvError);

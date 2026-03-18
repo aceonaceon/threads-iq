@@ -6,6 +6,7 @@ import Analyze from './pages/Analyze';
 import Report from './pages/Report';
 import History from './pages/History';
 import Login from './pages/Login';
+import Affiliate from './pages/Affiliate';
 import { AuthProvider, useAuth } from './lib/auth';
 
 // Auth success handler component
@@ -85,6 +86,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <History />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/affiliate" 
+        element={
+          <ProtectedRoute>
+            <Affiliate />
           </ProtectedRoute>
         } 
       />

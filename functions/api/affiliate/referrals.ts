@@ -1,5 +1,4 @@
 interface Env {
-  LINE_CHANNEL_ID: string;
   LINE_CHANNEL_SECRET: string;
   THREADSIQ_STORE: KVNamespace;
 }
@@ -12,7 +11,6 @@ interface TokenPayload {
   exp: number;
 }
 
-// Unicode-safe base64 decode
 function base64Decode(str: string): string {
   const binary = atob(str);
   const bytes = new Uint8Array(binary.length);
@@ -47,7 +45,6 @@ async function verifyToken(token: string, secret: string): Promise<TokenPayload 
     
     const payload = JSON.parse(base64Decode(payloadStr)) as TokenPayload;
     
-    // Check expiration
     const now = Math.floor(Date.now() / 1000);
     if (payload.exp < now) return null;
     
@@ -65,21 +62,6 @@ function getAuthToken(request: Request): string | null {
   return null;
 }
 
-// Check and reset weekly quota if needed
-function checkAndResetWeeklyQuota(userData: any): any {
-  const now = new Date();
-  const resetAt = new Date(userData.weeklyResetAt);
-  const daysSinceReset = (now.getTime() - resetAt.getTime()) / (1000 * 60 * 60 * 24);
-  
-  if (daysSinceReset >= 7) {
-    // Reset weekly uses
-    userData.weeklyUses = 0;
-    userData.weeklyResetAt = now.toISOString();
-  }
-  
-  return userData;
-}
-
 export const onRequestGet: PagesFunction<Env> = async (context): Promise<Response> => {
   const headers = {
     'Access-Control-Allow-Origin': '*',
@@ -94,7 +76,7 @@ export const onRequestGet: PagesFunction<Env> = async (context): Promise<Respons
 
   const token = getAuthToken(context.request);
   if (!token) {
-    return new Response(JSON.stringify({ error: '未登入' }), { status: 401, headers });
+    return new Response(JSON.stringify({ error: '請先登入' }), { status: 401, headers });
   }
 
   const payload = await verifyToken(token, context.env.LINE_CHANNEL_SECRET);
@@ -102,38 +84,13 @@ export const onRequestGet: PagesFunction<Env> = async (context): Promise<Respons
     return new Response(JSON.stringify({ error: 'Invalid token' }), { status: 401, headers });
   }
 
-  // Get user data from KV
-  const userStr = await context.env.THREADSIQ_STORE.get(`user:${payload.sub}`);
-  if (!userStr) {
-    return new Response(JSON.stringify({ error: 'User not found' }), { status: 404, headers });
-  }
-
-  let userData = JSON.parse(userStr);
-  
-  // Check and reset weekly quota if needed
-  userData = checkAndResetWeeklyQuota(userData);
-  
-  // Save updated user data with reset weekly uses if needed
-  if (userData.weeklyUses === 0 && userStr !== JSON.stringify(userData)) {
-    await context.env.THREADSIQ_STORE.put(`user:${payload.sub}`, JSON.stringify(userData));
-  }
-  
-  // Calculate remaining uses (3 free uses per week + bonus uses)
-  const FREE_USES = 3;
-  const weeklyRemaining = Math.max(0, FREE_USES - (userData.weeklyUses || 0));
-  const bonusUses = userData.bonusUses || 0;
-  const totalRemaining = weeklyRemaining + bonusUses;
+  // Get referral list from KV
+  const referralListKey = `referrals:${payload.sub}`;
+  const referralListStr = await context.env.THREADSIQ_STORE.get(referralListKey);
+  const referralList = referralListStr ? JSON.parse(referralListStr) : [];
 
   return new Response(JSON.stringify({
-    userId: payload.sub,
-    displayName: payload.name,
-    pictureUrl: payload.pic,
-    weeklyUses: userData.weeklyUses || 0,
-    weeklyRemaining,
-    bonusUses,
-    totalRemaining,
-    referralCode: userData.referralCode || '',
-    totalReferrals: userData.totalReferrals || 0,
-    createdAt: userData.createdAt,
+    referrals: referralList,
+    total: referralList.length,
   }), { status: 200, headers });
 };

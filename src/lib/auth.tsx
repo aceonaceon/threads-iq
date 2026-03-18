@@ -4,8 +4,12 @@ interface User {
   id: string;
   name: string;
   avatarUrl?: string;
-  usageCount: number;
-  remainingUses: number;
+  weeklyUses: number;
+  weeklyRemaining: number;
+  bonusUses: number;
+  totalRemaining: number;
+  referralCode: string;
+  totalReferrals: number;
 }
 
 interface AuthContextType {
@@ -71,8 +75,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           id: userData.userId,
           name: userData.displayName,
           avatarUrl: userData.pictureUrl,
-          usageCount: userData.usageCount || 0,
-          remainingUses: userData.remainingUses,
+          weeklyUses: userData.weeklyUses || 0,
+          weeklyRemaining: userData.weeklyRemaining,
+          bonusUses: userData.bonusUses,
+          totalRemaining: userData.totalRemaining,
+          referralCode: userData.referralCode || '',
+          totalReferrals: userData.totalReferrals || 0,
         });
       } else {
         clearToken();
@@ -103,7 +111,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = () => {
-    window.location.href = '/api/auth/login';
+    // Get ref code from localStorage if exists
+    const refCode = localStorage.getItem('threadsiq_ref');
+    const refParam = refCode ? `?ref=${refCode}` : '';
+    window.location.href = `/api/auth/login${refParam}`;
   };
 
   const logout = () => {

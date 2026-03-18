@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import PostInput from '../components/PostInput';
 import { runAnalysis, getTopicAnalysisWithClusters, AnalysisResult } from '../lib/api';
@@ -21,9 +21,11 @@ export default function Analyze() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [step, setStep] = useState('');
   const [error, setError] = useState('');
-  const [remainingUses, setRemainingUses] = useState(MAX_FREE_USES);
+  const [weeklyRemaining, setWeeklyRemaining] = useState(MAX_FREE_USES);
+  const [bonusRemaining, setBonusRemaining] = useState(0);
   const [showBulkImport, setShowBulkImport] = useState(false);
   const [bulkText, setBulkText] = useState('');
+  const [showUsageExceededModal, setShowUsageExceededModal] = useState(false);
 
   // Load user data on mount
   useEffect(() => {
@@ -37,13 +39,16 @@ export default function Analyze() {
           })
             .then(res => res.json())
             .then(data => {
-              setRemainingUses(data.remainingUses ?? MAX_FREE_USES);
+              setWeeklyRemaining(data.weeklyRemaining ?? MAX_FREE_USES);
+              setBonusRemaining(data.bonusUses ?? 0);
             })
             .catch(console.error);
         }
       });
     }
   }, [isAuthenticated, refreshUser]);
+
+  const totalRemaining = weeklyRemaining + bonusRemaining;
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -94,7 +99,7 @@ export default function Analyze() {
     setError('');
 
     try {
-      // Step 1: Get embeddings from server
+      // Step 1: Get embeddings from server (includes usage check)
       setStep('正在分析你的貼文語意...');
       
       const result = await runAnalysis(validPosts, user.id);
@@ -155,13 +160,24 @@ export default function Analyze() {
         
         if (saveResponse.ok) {
           const saveData = await saveResponse.json();
-          setRemainingUses(saveData.remainingUses);
+          // Update remaining uses from response
+          if (saveData.remaining !== undefined) {
+            setWeeklyRemaining(saveData.remaining);
+          }
+          if (saveData.bonusRemaining !== undefined) {
+            setBonusRemaining(saveData.bonusRemaining);
+          }
         }
       }
       
       navigate(`/report/${result.id}`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '分析失敗，請稍後再試');
+    } catch (err: any) {
+      // Handle usage exceeded error
+      if (err.message === 'usage_exceeded' || (err.response?.data?.error === 'usage_exceeded')) {
+        setShowUsageExceededModal(true);
+      } else {
+        setError(err instanceof Error ? err.message : '分析失敗，請稍後再試');
+      }
     } finally {
       setIsAnalyzing(false);
       setStep('');
@@ -193,135 +209,181 @@ export default function Analyze() {
   }
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] py-8 px-4">
-      <div className="max-w-3xl mx-auto">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold mb-2">輸入你的 Threads 貼文</h1>
-          <p className="text-gray-500">
-            貼上你最近發布的 {MIN_POSTS}-{MAX_POSTS} 篇貼文，讓 AI 分析你的內容主題
-          </p>
-        </div>
-
-        {/* Bulk import toggle */}
-        <div className="flex justify-end mb-4">
-          <button
-            onClick={() => setShowBulkImport(!showBulkImport)}
-            className="text-sm text-accent hover:text-accent-hover transition-colors flex items-center gap-1"
-          >
-            {showBulkImport ? '← 逐篇輸入' : '📋 批量匯入'}
-          </button>
-        </div>
-
-        {/* Bulk import panel */}
-        {showBulkImport && (
-          <div className="bg-surface rounded-xl p-6 mb-8">
-            <h3 className="text-lg font-semibold mb-2">批量匯入貼文</h3>
-            <p className="text-gray-500 text-sm mb-4">
-              將多篇貼文貼在下方，每篇之間用 <code className="bg-gray-800 px-1.5 py-0.5 rounded text-accent">---</code> 分隔
+    <>
+      {/* Usage Exceeded Modal */}
+      {showUsageExceededModal && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 px-4">
+          <div className="bg-surface rounded-2xl p-8 max-w-md w-full text-center border border-gray-700">
+            <div className="text-5xl mb-4">😔</div>
+            <h2 className="text-2xl font-bold mb-2">本週免費次數已用完</h2>
+            <p className="text-gray-400 mb-6">
+              別擔心！分享連結給朋友，立即獲得 10 次額外分析
             </p>
-            <textarea
-              value={bulkText}
-              onChange={e => setBulkText(e.target.value)}
-              placeholder={`第一篇貼文內容...\n---\n第二篇貼文內容...\n---\n第三篇貼文內容...`}
-              className="w-full h-64 bg-gray-900 border border-gray-800 rounded-lg p-4 text-gray-200 placeholder-gray-600 focus:border-accent focus:outline-none resize-y text-sm"
-            />
-            <div className="flex items-center justify-between mt-4">
-              <span className="text-gray-500 text-sm">
-                偵測到 {bulkText.split(bulkText.includes('\n---\n') ? '\n---\n' : '\n===\n').filter(p => p.trim()).length} 篇貼文
-              </span>
-              <button
-                onClick={handleBulkImport}
-                disabled={bulkText.split(bulkText.includes('\n---\n') ? '\n---\n' : '\n===\n').filter(p => p.trim()).length < MIN_POSTS}
-                className={`px-6 py-2 rounded-lg font-semibold transition-all ${
-                  bulkText.split(bulkText.includes('\n---\n') ? '\n---\n' : '\n===\n').filter(p => p.trim()).length >= MIN_POSTS
-                    ? 'bg-accent hover:bg-accent-hover text-white'
-                    : 'bg-gray-800 text-gray-500 cursor-not-allowed'
-                }`}
+            <div className="flex flex-col gap-3">
+              <Link
+                to="/affiliate"
+                onClick={() => setShowUsageExceededModal(false)}
+                className="px-6 py-3 bg-accent hover:bg-accent-hover text-white font-medium rounded-xl transition-colors"
               >
-                匯入
+                分享連結獲得更多次數 →
+              </Link>
+              <button
+                onClick={() => setShowUsageExceededModal(false)}
+                className="text-gray-500 hover:text-gray-400 text-sm transition-colors"
+              >
+                先不要
               </button>
             </div>
+            <p className="text-gray-600 text-xs mt-4">
+              升級付費（即將推出）
+            </p>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Remaining uses */}
-        <div className="bg-surface rounded-xl p-4 mb-8 flex items-center justify-between">
-          <span className="text-gray-400">剩餘免費分析次數</span>
-          <div className="flex gap-1">
-            {Array.from({ length: MAX_FREE_USES }).map((_, i) => (
-              <div
-                key={i}
-                className={`w-3 h-3 rounded-full ${
-                  i < remainingUses ? 'bg-accent' : 'bg-gray-700'
-                }`}
+      <div className="min-h-[calc(100vh-4rem)] py-8 px-4">
+        <div className="max-w-3xl mx-auto">
+          {/* Header */}
+          <div className="text-center mb-8">
+            <h1 className="text-3xl font-bold mb-2">輸入你的 Threads 貼文</h1>
+            <p className="text-gray-500">
+              貼上你最近發布的 {MIN_POSTS}-{MAX_POSTS} 篇貼文，讓 AI 分析你的內容主題
+            </p>
+          </div>
+
+          {/* Bulk import toggle */}
+          <div className="flex justify-end mb-4">
+            <button
+              onClick={() => setShowBulkImport(!showBulkImport)}
+              className="text-sm text-accent hover:text-accent-hover transition-colors flex items-center gap-1"
+            >
+              {showBulkImport ? '← 逐篇輸入' : '📋 批量匯入'}
+            </button>
+          </div>
+
+          {/* Bulk import panel */}
+          {showBulkImport && (
+            <div className="bg-surface rounded-xl p-6 mb-8">
+              <h3 className="text-lg font-semibold mb-2">批量匯入貼文</h3>
+              <p className="text-gray-500 text-sm mb-4">
+                將多篇貼文貼在下方，每篇之間用 <code className="bg-gray-800 px-1.5 py-0.5 rounded text-accent">---</code> 分隔
+              </p>
+              <textarea
+                value={bulkText}
+                onChange={e => setBulkText(e.target.value)}
+                placeholder={`第一篇貼文內容...\n---\n第二篇貼文內容...\n---\n第三篇貼文內容...`}
+                className="w-full h-64 bg-gray-900 border border-gray-800 rounded-lg p-4 text-gray-200 placeholder-gray-600 focus:border-accent focus:outline-none resize-y text-sm"
+              />
+              <div className="flex items-center justify-between mt-4">
+                <span className="text-gray-500 text-sm">
+                  偵測到 {bulkText.split(bulkText.includes('\n---\n') ? '\n---\n' : '\n===\n').filter(p => p.trim()).length} 篇貼文
+                </span>
+                <button
+                  onClick={handleBulkImport}
+                  disabled={bulkText.split(bulkText.includes('\n---\n') ? '\n---\n' : '\n===\n').filter(p => p.trim()).length < MIN_POSTS}
+                  className={`px-6 py-2 rounded-lg font-semibold transition-all ${
+                    bulkText.split(bulkText.includes('\n---\n') ? '\n---\n' : '\n===\n').filter(p => p.trim()).length >= MIN_POSTS
+                      ? 'bg-accent hover:bg-accent-hover text-white'
+                      : 'bg-gray-800 text-gray-500 cursor-not-allowed'
+                  }`}
+                >
+                  匯入
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Remaining uses - Updated to show weekly + bonus */}
+          <div className="bg-surface rounded-xl p-4 mb-8 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-gray-400">剩餘次數</span>
+              {bonusRemaining > 0 && (
+                <span className="text-xs bg-accent/20 text-accent px-2 py-0.5 rounded-full">
+                  +{bonusRemaining} 獎勵
+                </span>
+              )}
+            </div>
+            <div className="flex gap-1">
+              {Array.from({ length: Math.min(totalRemaining, MAX_FREE_USES) }).map((_, i) => (
+                <div
+                  key={i}
+                  className={`w-3 h-3 rounded-full ${
+                    i < weeklyRemaining ? 'bg-accent' : 'bg-yellow-500'
+                  }`}
+                />
+              ))}
+              {totalRemaining === 0 && (
+                <span className="text-red-400 text-sm">已用完</span>
+              )}
+              {totalRemaining > MAX_FREE_USES && (
+                <span className="text-yellow-500 text-sm ml-2">+{totalRemaining - MAX_FREE_USES}</span>
+              )}
+            </div>
+          </div>
+
+          {/* Post inputs */}
+          <div className="space-y-4 mb-8">
+            {posts.map((post, index) => (
+              <PostInput
+                key={index}
+                index={index}
+                value={post}
+                onChange={(value) => updatePost(index, value)}
+                onRemove={() => removePost(index)}
+                canRemove={posts.length > MIN_POSTS}
               />
             ))}
           </div>
-        </div>
 
-        {/* Post inputs */}
-        <div className="space-y-4 mb-8">
-          {posts.map((post, index) => (
-            <PostInput
-              key={index}
-              index={index}
-              value={post}
-              onChange={(value) => updatePost(index, value)}
-              onRemove={() => removePost(index)}
-              canRemove={posts.length > MIN_POSTS}
-            />
-          ))}
-        </div>
+          {/* Add more button */}
+          {posts.length < MAX_POSTS && (
+            <button
+              onClick={addPost}
+              className="w-full py-3 border-2 border-dashed border-gray-800 rounded-xl text-gray-500 hover:border-gray-700 hover:text-gray-400 transition-colors mb-8"
+            >
+              + 新增貼文
+            </button>
+          )}
 
-        {/* Add more button */}
-        {posts.length < MAX_POSTS && (
+          {/* Error message */}
+          {error && (
+            <div className="bg-red-500/10 border border-red-500/50 rounded-xl p-4 mb-6 text-red-400 text-center">
+              {error}
+            </div>
+          )}
+
+          {/* Analyzing state */}
+          {isAnalyzing && (
+            <div className="bg-surface rounded-xl p-8 mb-6">
+              <div className="flex items-center justify-center gap-3 mb-4">
+                <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+                <span className="text-gray-300">{step}</span>
+              </div>
+              <div className="text-center text-gray-500 text-sm">
+                這可能需要幾秒鐘...
+              </div>
+            </div>
+          )}
+
+          {/* Submit button */}
           <button
-            onClick={addPost}
-            className="w-full py-3 border-2 border-dashed border-gray-800 rounded-xl text-gray-500 hover:border-gray-700 hover:text-gray-400 transition-colors mb-8"
+            onClick={handleAnalyze}
+            disabled={isAnalyzing || validPosts.length < MIN_POSTS || totalRemaining <= 0}
+            className={`w-full py-4 rounded-xl font-semibold text-lg transition-all ${
+              isAnalyzing || validPosts.length < MIN_POSTS || totalRemaining <= 0
+                ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
+                : 'bg-accent hover:bg-accent-hover text-white hover:scale-[1.02]'
+            }`}
           >
-            + 新增貼文
+            {isAnalyzing ? '分析中...' : '開始分析'}
           </button>
-        )}
 
-        {/* Error message */}
-        {error && (
-          <div className="bg-red-500/10 border border-red-500/50 rounded-xl p-4 mb-6 text-red-400 text-center">
-            {error}
-          </div>
-        )}
-
-        {/* Analyzing state */}
-        {isAnalyzing && (
-          <div className="bg-surface rounded-xl p-8 mb-6">
-            <div className="flex items-center justify-center gap-3 mb-4">
-              <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
-              <span className="text-gray-300">{step}</span>
-            </div>
-            <div className="text-center text-gray-500 text-sm">
-              這可能需要幾秒鐘...
-            </div>
-          </div>
-        )}
-
-        {/* Submit button */}
-        <button
-          onClick={handleAnalyze}
-          disabled={isAnalyzing || validPosts.length < MIN_POSTS || remainingUses <= 0}
-          className={`w-full py-4 rounded-xl font-semibold text-lg transition-all ${
-            isAnalyzing || validPosts.length < MIN_POSTS || remainingUses <= 0
-              ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
-              : 'bg-accent hover:bg-accent-hover text-white hover:scale-[1.02]'
-          }`}
-        >
-          {isAnalyzing ? '分析中...' : '開始分析'}
-        </button>
-
-        {/* Post count hint */}
-        <p className="text-center text-gray-600 text-sm mt-4">
-          已輸入 {validPosts.length} 篇貼文（最少 {MIN_POSTS} 篇）
-        </p>
+          {/* Post count hint */}
+          <p className="text-center text-gray-600 text-sm mt-4">
+            已輸入 {validPosts.length} 篇貼文（最少 {MIN_POSTS} 篇）
+          </p>
+        </div>
       </div>
-    </div>
+    </>
   );
 }

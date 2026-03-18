@@ -1,8 +1,20 @@
 import { Link } from 'react-router-dom';
+import { useEffect } from 'react';
 import { useAuth } from '../lib/auth';
 
 export default function Landing() {
   const { user, login } = useAuth();
+
+  // Store ref code from URL in localStorage when page loads
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const refCode = urlParams.get('ref');
+    if (refCode) {
+      localStorage.setItem('threadsiq_ref', refCode);
+      // Clean up URL
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
 
   const handleAnalyze = () => {
     if (!user) {

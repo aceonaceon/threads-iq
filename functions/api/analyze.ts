@@ -1,5 +1,7 @@
 interface Env {
   OPENAI_API_KEY: string;
+  LINE_CHANNEL_SECRET: string;
+  THREADSIQ_STORE: KVNamespace;
 }
 
 interface PostRequest {
@@ -8,6 +10,119 @@ interface PostRequest {
 
 interface EmbeddingResponse {
   embeddings: number[][];
+}
+
+// Token verification helpers
+interface TokenPayload {
+  sub: string;
+  name: string;
+  pic: string;
+  iat: number;
+  exp: number;
+}
+
+function base64Decode(str: string): string {
+  const binary = atob(str);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return new TextDecoder().decode(bytes);
+}
+
+async function verifyToken(token: string, secret: string): Promise<TokenPayload | null> {
+  try {
+    const [payloadStr, sigStr] = token.split('.');
+    if (!payloadStr || !sigStr) return null;
+    
+    const encoder = new TextEncoder();
+    const key = await crypto.subtle.importKey(
+      'raw',
+      encoder.encode(secret),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign']
+    );
+    const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(payloadStr));
+    const sigBytes = new Uint8Array(signature);
+    let sigBinary = '';
+    for (const byte of sigBytes) {
+      sigBinary += String.fromCharCode(byte);
+    }
+    const expectedSig = btoa(sigBinary);
+    
+    if (sigStr !== expectedSig) return null;
+    
+    const payload = JSON.parse(base64Decode(payloadStr)) as TokenPayload;
+    
+    const now = Math.floor(Date.now() / 1000);
+    if (payload.exp < now) return null;
+    
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
+function getAuthToken(request: Request): string | null {
+  const authHeader = request.headers.get('Authorization');
+  if (authHeader?.startsWith('Bearer ')) {
+    return authHeader.substring(7);
+  }
+  return null;
+}
+
+// Check and reset weekly quota, return updated user data
+async function checkAndConsumeUsage(userId: string, kv: KVNamespace, secret: string): Promise<{ user: any; remaining: number; bonusRemaining: number; error?: string }> {
+  const userStr = await kv.get(`user:${userId}`);
+  if (!userStr) {
+    return { user: null, remaining: 0, bonusRemaining: 0, error: 'User not found' };
+  }
+
+  let userData = JSON.parse(userStr);
+  
+  // Check and reset weekly quota if needed
+  const now = new Date();
+  const resetAt = new Date(userData.weeklyResetAt);
+  const daysSinceReset = (now.getTime() - resetAt.getTime()) / (1000 * 60 * 60 * 24);
+  
+  if (daysSinceReset >= 7) {
+    userData.weeklyUses = 0;
+    userData.weeklyResetAt = now.toISOString();
+  }
+
+  const FREE_USES = 3;
+  const weeklyRemaining = Math.max(0, FREE_USES - (userData.weeklyUses || 0));
+  const bonusUses = userData.bonusUses || 0;
+
+  // Determine which quota to use
+  if (weeklyRemaining > 0) {
+    // Use weekly quota
+    userData.weeklyUses = (userData.weeklyUses || 0) + 1;
+  } else if (bonusUses > 0) {
+    // Use bonus uses
+    userData.bonusUses = bonusUses - 1;
+  } else {
+    // No quota left
+    return { 
+      user: userData, 
+      remaining: 0, 
+      bonusRemaining: 0,
+      error: 'usage_exceeded' 
+    };
+  }
+
+  // Save updated user
+  await kv.put(`user:${userId}`, JSON.stringify(userData));
+
+  const newWeeklyRemaining = Math.max(0, FREE_USES - (userData.weeklyUses || 0));
+  const newBonusRemaining = userData.bonusUses || 0;
+
+  return {
+    user: userData,
+    remaining: newWeeklyRemaining,
+    bonusRemaining: newBonusRemaining,
+  };
 }
 
 export const onRequestPost: PagesFunction<Env> = async (context): Promise<Response> => {
@@ -25,6 +140,42 @@ export const onRequestPost: PagesFunction<Env> = async (context): Promise<Respon
   }
 
   try {
+    // Verify authentication
+    const token = getAuthToken(context.request);
+    if (!token) {
+      return new Response(
+        JSON.stringify({ error: '請先登入' }),
+        { status: 401, headers }
+      );
+    }
+
+    const payload = await verifyToken(token, context.env.LINE_CHANNEL_SECRET);
+    if (!payload) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid token' }),
+        { status: 401, headers }
+      );
+    }
+
+    // Check and consume usage quota
+    const usageResult = await checkAndConsumeUsage(
+      payload.sub,
+      context.env.THREADSIQ_STORE,
+      context.env.LINE_CHANNEL_SECRET
+    );
+
+    if (usageResult.error) {
+      return new Response(
+        JSON.stringify({ 
+          error: usageResult.error, 
+          message: '本週免費次數已用完',
+          remaining: 0,
+          bonusRemaining: 0,
+        }),
+        { status: 403, headers }
+      );
+    }
+
     const { posts } = await context.request.json() as PostRequest;
 
     if (!posts || !Array.isArray(posts) || posts.length === 0) {
@@ -92,7 +243,14 @@ export const onRequestPost: PagesFunction<Env> = async (context): Promise<Respon
 
     const result: EmbeddingResponse = { embeddings };
 
-    return new Response(JSON.stringify(result), { status: 200, headers });
+    // Include remaining usage in response
+    const responseData = {
+      ...result,
+      remaining: usageResult.remaining,
+      bonusRemaining: usageResult.bonusRemaining,
+    };
+
+    return new Response(JSON.stringify(responseData), { status: 200, headers });
 
   } catch (error) {
     console.error('Error in /api/analyze:', error);
