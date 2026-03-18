@@ -18,6 +18,8 @@ export default function Analyze() {
   const [step, setStep] = useState('');
   const [error, setError] = useState('');
   const [remainingUses, setRemainingUses] = useState(MAX_FREE_USES);
+  const [showBulkImport, setShowBulkImport] = useState(false);
+  const [bulkText, setBulkText] = useState('');
 
   useEffect(() => {
     if (!user) {
@@ -35,6 +37,20 @@ export default function Analyze() {
   }, [user]);
 
   const validPosts = posts.filter(p => p.trim().length > 0);
+
+  const handleBulkImport = () => {
+    const separator = bulkText.includes('\n---\n') ? '\n---\n' : '\n===\n';
+    const imported = bulkText
+      .split(separator)
+      .map(p => p.trim())
+      .filter(p => p.length > 0)
+      .slice(0, MAX_POSTS);
+    if (imported.length >= MIN_POSTS) {
+      setPosts(imported);
+      setShowBulkImport(false);
+      setBulkText('');
+    }
+  };
 
   const addPost = () => {
     if (posts.length < MAX_POSTS) {
@@ -135,6 +151,48 @@ export default function Analyze() {
             貼上你最近發布的 {MIN_POSTS}-{MAX_POSTS} 篇貼文，讓 AI 分析你的內容主題
           </p>
         </div>
+
+        {/* Bulk import toggle */}
+        <div className="flex justify-end mb-4">
+          <button
+            onClick={() => setShowBulkImport(!showBulkImport)}
+            className="text-sm text-accent hover:text-accent-hover transition-colors flex items-center gap-1"
+          >
+            {showBulkImport ? '← 逐篇輸入' : '📋 批量匯入'}
+          </button>
+        </div>
+
+        {/* Bulk import panel */}
+        {showBulkImport && (
+          <div className="bg-surface rounded-xl p-6 mb-8">
+            <h3 className="text-lg font-semibold mb-2">批量匯入貼文</h3>
+            <p className="text-gray-500 text-sm mb-4">
+              將多篇貼文貼在下方，每篇之間用 <code className="bg-gray-800 px-1.5 py-0.5 rounded text-accent">---</code> 分隔
+            </p>
+            <textarea
+              value={bulkText}
+              onChange={e => setBulkText(e.target.value)}
+              placeholder={`第一篇貼文內容...\n---\n第二篇貼文內容...\n---\n第三篇貼文內容...`}
+              className="w-full h-64 bg-gray-900 border border-gray-800 rounded-lg p-4 text-gray-200 placeholder-gray-600 focus:border-accent focus:outline-none resize-y text-sm"
+            />
+            <div className="flex items-center justify-between mt-4">
+              <span className="text-gray-500 text-sm">
+                偵測到 {bulkText.split(bulkText.includes('\n---\n') ? '\n---\n' : '\n===\n').filter(p => p.trim()).length} 篇貼文
+              </span>
+              <button
+                onClick={handleBulkImport}
+                disabled={bulkText.split(bulkText.includes('\n---\n') ? '\n---\n' : '\n===\n').filter(p => p.trim()).length < MIN_POSTS}
+                className={`px-6 py-2 rounded-lg font-semibold transition-all ${
+                  bulkText.split(bulkText.includes('\n---\n') ? '\n---\n' : '\n===\n').filter(p => p.trim()).length >= MIN_POSTS
+                    ? 'bg-accent hover:bg-accent-hover text-white'
+                    : 'bg-gray-800 text-gray-500 cursor-not-allowed'
+                }`}
+              >
+                匯入
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Remaining uses */}
         <div className="bg-surface rounded-xl p-4 mb-8 flex items-center justify-between">
