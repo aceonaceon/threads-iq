@@ -42,10 +42,12 @@ export interface HistoryItem {
 
 // Call the /api/analyze endpoint to get real embeddings
 async function getEmbeddings(posts: string[]): Promise<{ embeddings: number[][]; remaining: number; bonusRemaining: number }> {
+  const token = localStorage.getItem('threadsiq_token');
   const response = await fetch('/api/analyze', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
     },
     body: JSON.stringify({ posts }),
   });
