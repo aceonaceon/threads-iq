@@ -426,9 +426,9 @@ export default function Landing() {
       </section>
 
       {/* Section 8: 定價方案 */}
-      <section className="py-20 px-4">
+      <section id="pricing" className="py-20 px-4">
         <div className="max-w-5xl mx-auto">
-          <h2 id="pricing" className="text-3xl font-bold text-center mb-4">選擇你的方案</h2>
+          <h2 className="text-3xl font-bold text-center mb-4">選擇你的方案</h2>
           <p className="text-gray-400 text-center mb-12 text-sm">
             目前語意分析功能完全免費開放。進階功能陸續上線中。
           </p>
@@ -445,17 +445,20 @@ export default function Landing() {
                 <p className="text-gray-500 text-sm mt-1">體驗語意分析</p>
               </div>
               <ul className="space-y-3 text-sm flex-1 mb-6">
-                <li className="flex items-start gap-2"><span className="text-green-400 mt-0.5">✅</span><span className="text-gray-300">每月 3 次分析</span></li>
-                <li className="flex items-start gap-2"><span className="text-green-400 mt-0.5">✅</span><span className="text-gray-300">手動貼文輸入（最多 10 篇）</span></li>
-                <li className="flex items-start gap-2"><span className="text-green-400 mt-0.5">✅</span><span className="text-gray-300">健康分數</span></li>
-                <li className="flex items-start gap-2"><span className="text-green-400 mt-0.5">✅</span><span className="text-gray-300">語意集群分析（基本版）</span></li>
+                <li className="flex items-start gap-2"><span className="text-green-400 mt-0.5">✅</span><span className="text-gray-300">每週 3 次語意分析（每 7 天重置）</span></li>
+                <li className="flex items-start gap-2"><span className="text-green-400 mt-0.5">✅</span><span className="text-gray-300">手動貼文輸入（最多 30 篇）</span></li>
+                <li className="flex items-start gap-2"><span className="text-green-400 mt-0.5">✅</span><span className="text-gray-300">健康分數 + 語意集群分析</span></li>
                 <li className="flex items-start gap-2"><span className="text-green-400 mt-0.5">✅</span><span className="text-gray-300">偏離貼文偵測</span></li>
-                <li className="flex items-start gap-2"><span className="text-green-400 mt-0.5">✅</span><span className="text-gray-300">下一篇 AI 建議</span></li>
-                <li className="flex items-start gap-2"><span className="text-green-400 mt-0.5">✅</span><span className="text-gray-300">歷史紀錄（最近 3 次）</span></li>
-                <li className="flex items-start gap-2"><span className="text-gray-600 mt-0.5">—</span><span className="text-gray-500">自動抓文</span></li>
+                <li className="flex items-start gap-2"><span className="text-green-400 mt-0.5">✅</span><span className="text-gray-300">AI 下一篇方向建議</span></li>
+                <li className="flex items-start gap-2"><span className="text-green-400 mt-0.5">✅</span><span className="text-gray-300">歷史記錄（最近 3 次）</span></li>
+                <li className="flex items-start gap-2"><span className="text-green-400 mt-0.5">✅</span><span className="text-gray-300">推薦好友雙方各 +10 次（永不過期）</span></li>
+                <li className="flex items-start gap-2"><span className="text-gray-600 mt-0.5">—</span><span className="text-gray-500">Threads OAuth 自動抓文</span></li>
                 <li className="flex items-start gap-2"><span className="text-gray-600 mt-0.5">—</span><span className="text-gray-500">發文前語意評分</span></li>
+                <li className="flex items-start gap-2"><span className="text-gray-600 mt-0.5">—</span><span className="text-gray-500">內容蠶食偵測</span></li>
+                <li className="flex items-start gap-2"><span className="text-gray-600 mt-0.5">—</span><span className="text-gray-500">Hook 格式評分</span></li>
                 <li className="flex items-start gap-2"><span className="text-gray-600 mt-0.5">—</span><span className="text-gray-500">串文複利引擎</span></li>
-                <li className="flex items-start gap-2"><span className="text-gray-600 mt-0.5">—</span><span className="text-gray-500">排程與自動化功能</span></li>
+                <li className="flex items-start gap-2"><span className="text-gray-600 mt-0.5">—</span><span className="text-gray-500">排程發文</span></li>
+                <li className="flex items-start gap-2"><span className="text-gray-600 mt-0.5">—</span><span className="text-gray-500">主題輪替管家</span></li>
               </ul>
               {user ? (
                 <Link to="/analyze" className="block w-full text-center py-3 rounded-xl border border-white/20 text-gray-300 hover:border-white/40 hover:text-white transition-colors text-sm font-semibold">
@@ -474,27 +477,26 @@ export default function Landing() {
                 <span className="bg-accent text-background text-xs font-bold px-3 py-1 rounded-full">最受歡迎</span>
               </div>
               <div className="mb-6">
-                <div className="text-accent text-sm font-medium mb-1">進階帳號</div>
+                <div className="text-accent text-sm font-medium mb-1">進階會員</div>
                 <div className="flex items-end gap-1">
-                  <span className="text-5xl font-black text-white">$12</span>
+                  <span className="text-5xl font-black text-white">NT$299</span>
                   <span className="text-gray-500 mb-2">/月</span>
                 </div>
                 <p className="text-accent text-sm mt-1">幫你寫對的內容</p>
               </div>
               <ul className="space-y-3 text-sm flex-1 mb-6">
                 <li className="flex items-start gap-2"><span className="text-green-400 mt-0.5">✅</span><span className="text-gray-300">無限次語意分析</span></li>
-                <li className="flex items-start gap-2"><span className="text-green-400 mt-0.5">✅</span><span className="text-gray-300">手動貼文輸入（最多 30 篇）</span></li>
-                <li className="flex items-start gap-2"><span className="text-green-400 mt-0.5">✅</span><span className="text-gray-300">健康分數</span></li>
-                <li className="flex items-start gap-2"><span className="text-green-400 mt-0.5">✅</span><span className="text-gray-300">語意集群分析（完整版）</span></li>
+                <li className="flex items-start gap-2"><span className="text-green-400 mt-0.5">✅</span><span className="text-gray-300">Threads OAuth 自動抓文（不限篇數）</span></li>
+                <li className="flex items-start gap-2"><span className="text-green-400 mt-0.5">✅</span><span className="text-gray-300">健康分數 + 語意集群分析</span></li>
                 <li className="flex items-start gap-2"><span className="text-green-400 mt-0.5">✅</span><span className="text-gray-300">偏離貼文偵測</span></li>
-                <li className="flex items-start gap-2"><span className="text-green-400 mt-0.5">✅</span><span className="text-gray-300">下一篇 AI 建議</span></li>
-                <li className="flex items-start gap-2"><span className="text-green-400 mt-0.5">✅</span><span className="text-gray-300">歷史紀錄（無限）</span></li>
-                <li className="flex items-start gap-2"><span className="text-yellow-500 mt-0.5">🔧</span><span className="text-gray-300">Threads OAuth 自動抓文 <span className="text-gray-500 text-xs">開發中</span></span></li>
+                <li className="flex items-start gap-2"><span className="text-green-400 mt-0.5">✅</span><span className="text-gray-300">AI 下一篇方向建議</span></li>
+                <li className="flex items-start gap-2"><span className="text-green-400 mt-0.5">✅</span><span className="text-gray-300">歷史記錄（無限）</span></li>
                 <li className="flex items-start gap-2"><span className="text-yellow-500 mt-0.5">🔧</span><span className="text-gray-300">發文前語意評分 <span className="text-gray-500 text-xs">開發中</span></span></li>
                 <li className="flex items-start gap-2"><span className="text-yellow-500 mt-0.5">🔧</span><span className="text-gray-300">內容蠶食偵測 <span className="text-gray-500 text-xs">開發中</span></span></li>
                 <li className="flex items-start gap-2"><span className="text-yellow-500 mt-0.5">🔧</span><span className="text-gray-300">Hook 格式評分 <span className="text-gray-500 text-xs">開發中</span></span></li>
                 <li className="flex items-start gap-2"><span className="text-yellow-500 mt-0.5">🔧</span><span className="text-gray-300">串文複利引擎 <span className="text-gray-500 text-xs">開發中</span></span></li>
-                <li className="flex items-start gap-2"><span className="text-gray-600 mt-0.5">—</span><span className="text-gray-500">排程與自動化功能</span></li>
+                <li className="flex items-start gap-2"><span className="text-gray-600 mt-0.5">—</span><span className="text-gray-500">排程發文</span></li>
+                <li className="flex items-start gap-2"><span className="text-gray-600 mt-0.5">—</span><span className="text-gray-500">主題輪替管家</span></li>
               </ul>
               {user ? (
                 <Link to="/analyze" className="block w-full text-center py-3 rounded-xl bg-cta hover:bg-cta-hover text-white transition-colors text-sm font-semibold">
@@ -510,9 +512,9 @@ export default function Landing() {
             {/* Pro 帳號 */}
             <div className="bg-surface rounded-2xl p-6 border border-white/10 flex flex-col">
               <div className="mb-6">
-                <div className="text-gray-400 text-sm font-medium mb-1">Pro 帳號</div>
+                <div className="text-gray-400 text-sm font-medium mb-1">Pro 會員</div>
                 <div className="flex items-end gap-1">
-                  <span className="text-5xl font-black text-white">$29</span>
+                  <span className="text-5xl font-black text-white">NT$999</span>
                   <span className="text-gray-500 mb-2">/月</span>
                 </div>
                 <p className="text-gray-300 text-sm mt-1">幫你在對的時間發，發完還幫你顧</p>
@@ -524,7 +526,7 @@ export default function Landing() {
                 <li className="flex items-start gap-2"><span className="text-yellow-500 mt-0.5">🔧</span><span className="text-gray-300">主題輪替管家 <span className="text-gray-500 text-xs">開發中</span></span></li>
                 <li className="flex items-start gap-2"><span className="text-yellow-500 mt-0.5">🔧</span><span className="text-gray-300">黃金窗口偵測 <span className="text-gray-500 text-xs">開發中</span></span></li>
                 <li className="flex items-start gap-2"><span className="text-yellow-500 mt-0.5">🔧</span><span className="text-gray-300">爆文 48h 行動計畫 <span className="text-gray-500 text-xs">開發中</span></span></li>
-                <li className="flex items-start gap-2"><span className="text-yellow-500 mt-0.5">🔧</span><span className="text-gray-300">語意衰變週報 <span className="text-gray-500 text-xs">開發中</span></span></li>
+                <li className="flex items-start gap-2"><span className="text-yellow-500 mt-0.5">🔧</span><span className="text-gray-300">語意衰變週報（LINE 推播） <span className="text-gray-500 text-xs">開發中</span></span></li>
                 <li className="flex items-start gap-2"><span className="text-yellow-500 mt-0.5">🔧</span><span className="text-gray-300">AI 回覆建議 <span className="text-gray-500 text-xs">開發中</span></span></li>
               </ul>
               {user ? (
@@ -599,9 +601,9 @@ export default function Landing() {
                 Q: 收費嗎？
               </h3>
               <p className="text-gray-400 text-sm">
-                目前的語意分析功能（健康分數、集群分析、AI 建議）<strong className="text-white">完全免費</strong>，每月 3 次。<br /><br />
-                進階帳號（$12/月）提供無限次分析 + 自動抓文、發文前評分、串文引擎等內容優化工具。<br /><br />
-                Pro 帳號（$29/月）在進階功能基礎上增加排程發文、黃金窗口偵測、爆文追蹤、語意週報等自動化功能，目前正積極開發中，Pro 會員將優先免費解鎖。<br /><br />
+                目前的語意分析功能（健康分數、集群分析、AI 建議）<strong className="text-white">完全免費</strong>，每週 3 次（每 7 天重置）。<br /><br />
+                進階會員（NT$299/月）提供無限次分析 + 自動抓文、發文前評分、內容蠶食偵測、Hook 格式評分、串文引擎等內容優化工具。<br /><br />
+                Pro 會員（NT$999/月）在進階功能基礎上增加排程發文、主題輪替管家、黃金窗口偵測、爆文 48h 行動計畫、語意衰變週報（LINE 推播）、AI 回覆建議等自動化功能，目前正積極開發中，Pro 會員將優先免費解鎖。<br /><br />
                 不需要信用卡即可開始使用免費版。
               </p>
             </div>

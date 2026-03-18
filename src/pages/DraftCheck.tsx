@@ -39,7 +39,7 @@ function getAuthToken(): string | null {
 }
 
 export default function DraftCheck() {
-  const { isAuthenticated, login } = useAuth();
+  const { isAuthenticated, login, user } = useAuth();
   
   const [hasHistory, setHasHistory] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
@@ -158,7 +158,45 @@ export default function DraftCheck() {
     );
   }
 
-  // No history - show prompt
+  // Get user plan - check if paid user
+  const userPlan = (user as any)?.plan;
+  const isPaidUser = userPlan === 'creator' || userPlan === 'pro';
+
+  // Free users ALWAYS see PremiumOverlay first (regardless of history)
+  if (!isPaidUser) {
+    return (
+      <>
+        <PremiumOverlay featureName="發文前語意評分" requiredPlan="creator" />
+        <div className="min-h-[calc(100vh-4rem)] py-8 px-4">
+          <div className="max-w-3xl mx-auto">
+            {/* Header */}
+            <div className="text-center mb-8">
+              <h1 className="text-3xl font-bold mb-2">發文前檢查</h1>
+              <p className="text-gray-500">
+                輸入你的草稿，AI 會分析語意方向、檢測蠶食風險、評估 Hook 品質
+              </p>
+            </div>
+
+            {/* Draft Input - blurred since premium feature */}
+            <div className="bg-surface rounded-xl p-6 mb-8 opacity-50 pointer-events-none">
+              <label className="block text-sm font-medium text-gray-400 mb-3">
+                貼文草稿
+              </label>
+              <textarea
+                value={draft}
+                onChange={e => setDraft(e.target.value)}
+                placeholder="在此輸入你的 Threads 草稿..."
+                className="w-full h-48 bg-gray-900 border border-gray-800 rounded-lg p-4 text-gray-200 placeholder-gray-600 focus:border-accent focus:outline-none resize-y"
+                disabled
+              />
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  // Paid users: only show "no history" message if they haven't done an analysis yet
   if (!hasHistory) {
     return (
       <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center px-4">
