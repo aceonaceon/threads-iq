@@ -25,17 +25,18 @@ export default function PremiumOverlay({ featureName }: PremiumOverlayProps) {
     <div className="relative">
       {/* Actual content underneath (rendered but blurred) */}
       
-      {/* Blur overlay */}
+      {/* Blur overlay - starts below navbar (top-14 = 3.5rem = navbar height) */}
       <div 
-        className="fixed inset-0 z-40 pointer-events-none"
+        className="fixed inset-x-0 bottom-0 z-30"
         style={{
+          top: '3.5rem',
           background: 'rgba(0, 0, 0, 0.75)',
           backdropFilter: 'blur(4px)',
         }}
       />
       
-      {/* CTA Card - positioned in center of viewport */}
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {/* CTA Card - positioned in center below navbar */}
+      <div className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-center p-4" style={{ top: '3.5rem' }}>
         <div 
           className="bg-gray-900 border border-gray-700 rounded-2xl p-8 max-w-md w-full text-center shadow-2xl animate-fade-in"
           style={{
