@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../lib/auth';
+import PremiumOverlay from '../components/PremiumOverlay';
 
 interface ThreadPost {
   order: number;
@@ -106,6 +107,7 @@ export default function ThreadGenerator() {
 
   return (
     <div className="min-h-[calc(100vh-4rem)] py-8">
+      <PremiumOverlay featureName="串文複利引擎" requiredPlan="pro" />
       <div className="max-w-3xl mx-auto px-4">
         {/* Header */}
         <div className="mb-8">

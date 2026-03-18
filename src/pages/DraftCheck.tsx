@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
+import PremiumOverlay from '../components/PremiumOverlay';
 
 interface SemanticScore {
   score: number;
@@ -180,6 +181,7 @@ export default function DraftCheck() {
 
   return (
     <div className="min-h-[calc(100vh-4rem)] py-8 px-4">
+      <PremiumOverlay featureName="發文前語意評分" requiredPlan="creator" />
       <div className="max-w-3xl mx-auto">
         {/* Header */}
         <div className="text-center mb-8">

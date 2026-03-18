@@ -4,6 +4,7 @@ import { useAuth } from '../lib/auth';
 import PostInput from '../components/PostInput';
 import { runAnalysis, getTopicAnalysisWithClusters, AnalysisResult } from '../lib/api';
 import { runAnalysis as runClientAnalysis, calculateHealthScore } from '../lib/analysis';
+import PremiumOverlay from '../components/PremiumOverlay';
 
 const MIN_POSTS = 5;
 const MAX_POSTS = 30;
@@ -364,7 +365,9 @@ export default function Analyze() {
 
           {/* Threads OAuth Section */}
           {isAuthenticated && user && (
-            <div className="bg-surface rounded-xl p-6 mb-8 border border-gray-800">
+            <div className="relative">
+              <PremiumOverlay featureName="Threads 自動匯入" requiredPlan="creator" />
+              <div className="bg-surface rounded-xl p-6 mb-8 border border-gray-800">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
                   <div className="text-2xl">🧵</div>
@@ -421,6 +424,7 @@ export default function Analyze() {
                   {threadsAuthMessage}
                 </div>
               )}
+            </div>
             </div>
           )}
 
