@@ -39,83 +39,140 @@ export interface HistoryItem {
   createdAt: string;
 }
 
-// Generate mock embeddings for demo (in production, this would come from OpenAI)
-function generateMockEmbeddings(posts: string[]): number[][] {
-  return posts.map(() => 
-    Array.from({ length: 1536 }, () => Math.random() * 2 - 1)
-  );
-}
+// Call the /api/analyze endpoint to get real embeddings
+async function getEmbeddings(posts: string[]): Promise<number[][]> {
+  const response = await fetch('/api/analyze', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ posts }),
+  });
 
-// Generate mock topic analysis (in production, this would come from GPT)
-function generateMockTopicAnalysis(posts: string[], clusterCount: number): TopicAnalysis {
-  const keywords = [
-    '留學規劃', '語言學習', '海外生活', '申請技巧', '簽證問題',
-    '獎學金', '選校建議', '職涯發展', '文化交流', '生活費规划'
-  ];
-  
-  const suggestions = [
-    '分享你的留學申請時間規劃',
-    '如何選擇適合的語言考試？',
-    '留學生活中的文化衝擊調適',
-    '國外租房經驗與建議',
-    '留學期間的兼職工作選擇'
-  ];
-  
-  const recommendations = [
-    '建議保持主題一致性，這有助於吸引特定受眾',
-    '可以考慮增加互動性內容，提高粉絲參與度',
-    '適時分享個人經驗，讓內容更具親和力'
-  ];
-
-  const clusters: Cluster[] = [];
-  const postsPerCluster = Math.floor(posts.length / clusterCount) || 1;
-  
-  for (let i = 0; i < clusterCount; i++) {
-    const clusterPosts = posts.slice(i * postsPerCluster, (i + 1) * postsPerCluster);
-    clusters.push({
-      id: i,
-      keywords: keywords[i % keywords.length],
-      postCount: clusterPosts.length,
-      percentage: Math.round(clusterPosts.length / posts.length * 100),
-      posts: clusterPosts.slice(0, 3),
-    });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || '取得語意嵌入失敗');
   }
 
-  return {
-    clusters,
-    healthScore: Math.floor(50 + Math.random() * 40),
-    healthAssessment: '中等',
-    nextPostSuggestions: suggestions.slice(0, 3),
-    recommendations,
-  };
+  const data = await response.json() as { embeddings: number[][] };
+  return data.embeddings;
 }
 
-export async function runAnalysis(posts: string[], _userId: string): Promise<AnalysisResult> {
-  // Generate mock embeddings (in production, this would call the API)
-  const embeddings = generateMockEmbeddings(posts);
+// Call the /api/topics endpoint to get real topic analysis
+async function getTopicAnalysis(
+  clusters: { id: number; posts: string[] }[],
+  allPosts: string[]
+): Promise<Omit<TopicAnalysis, 'healthScore'>> {
+  const response = await fetch('/api/topics', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ clusters, allPosts }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || '生成主題分析失敗');
+  }
+
+  return await response.json() as Omit<TopicAnalysis, 'healthScore'>;
+}
+
+// Get usage count from localStorage
+function getUsageCount(userId: string): number {
+  const key = `threadsiq_usage_${userId}`;
+  const stored = localStorage.getItem(key);
+  return stored ? parseInt(stored, 10) : 3;
+}
+
+// Save usage count to localStorage
+function saveUsageCount(userId: string, count: number): void {
+  const key = `threadsiq_usage_${userId}`;
+  localStorage.setItem(key, count.toString());
+}
+
+export async function runAnalysis(posts: string[], userId: string): Promise<AnalysisResult> {
+  // Check remaining uses
+  const remainingUses = getUsageCount(userId);
   
-  // Return mock result
+  // Generate unique analysis ID
   const analysisId = uuidv4();
-  const topicAnalysis = generateMockTopicAnalysis(posts, Math.min(3, Math.floor(posts.length / 3)));
-  
+
+  // Step 1: Get embeddings from API
+  const embeddings = await getEmbeddings(posts);
+
+  // Decrement usage count
+  const newRemainingUses = Math.max(0, remainingUses - 1);
+  saveUsageCount(userId, newRemainingUses);
+
   return {
     id: analysisId,
     embeddings,
     points2D: [],
     labels: [],
-    topicAnalysis,
-    remainingUses: 2,
+    topicAnalysis: {
+      clusters: [],
+      healthScore: 0,
+      healthAssessment: '',
+      nextPostSuggestions: [],
+      recommendations: [],
+    },
+    remainingUses: newRemainingUses,
   };
 }
 
-export async function getHistory(_userId: string): Promise<HistoryItem[]> {
-  return [];
+export async function getTopicAnalysisWithClusters(
+  posts: string[],
+  clusters: { id: number; posts: string[] }[]
+): Promise<Omit<TopicAnalysis, 'healthScore'>> {
+  return getTopicAnalysis(clusters, posts);
 }
 
-export async function getUsage(_userId: string): Promise<{ remaining: number }> {
-  return { remaining: 3 };
+export async function getHistory(userId: string): Promise<HistoryItem[]> {
+  const key = `threadsiq_analyses_${userId}`;
+  const stored = localStorage.getItem(key);
+  if (!stored) return [];
+  
+  try {
+    const analyses = JSON.parse(stored) as Array<{
+      id: string;
+      posts: string[];
+      result: AnalysisResult;
+      createdAt: string;
+    }>;
+    
+    return analyses.map(a => ({
+      id: a.id,
+      postCount: a.posts.length,
+      clusterCount: a.result.topicAnalysis.clusters.length,
+      noiseCount: a.result.labels.filter(l => l === -1).length,
+      healthScore: a.result.topicAnalysis.healthScore,
+      createdAt: a.createdAt,
+    }));
+  } catch {
+    return [];
+  }
 }
 
-export async function getAnalysis(_id: string): Promise<AnalysisResult> {
-  throw new Error('Not implemented');
+export async function getUsage(userId: string): Promise<{ remaining: number }> {
+  return { remaining: getUsageCount(userId) };
+}
+
+export async function getAnalysis(id: string): Promise<AnalysisResult> {
+  // Find in localStorage across all users (simplified for demo)
+  const keys = Object.keys(localStorage).filter(k => k.startsWith('threadsiq_analyses_'));
+  
+  for (const key of keys) {
+    const stored = localStorage.getItem(key);
+    if (stored) {
+      const analyses = JSON.parse(stored);
+      const found = analyses.find((a: { id: string; result: AnalysisResult }) => a.id === id);
+      if (found) {
+        return found.result;
+      }
+    }
+  }
+  
+  throw new Error('找不到分析結果');
 }

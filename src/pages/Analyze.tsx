@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import PostInput from '../components/PostInput';
-import { runAnalysis, AnalysisResult } from '../lib/api';
+import { runAnalysis, getTopicAnalysisWithClusters, AnalysisResult } from '../lib/api';
 import { runAnalysis as runClientAnalysis, calculateHealthScore } from '../lib/analysis';
 
 const MIN_POSTS = 5;
@@ -24,6 +24,15 @@ export default function Analyze() {
       loginAsGuest();
     }
   }, [user, loginAsGuest]);
+
+  // Load remaining uses from localStorage on mount
+  useEffect(() => {
+    if (user) {
+      const stored = localStorage.getItem(`threadsiq_usage_${user.id}`);
+      const count = stored ? parseInt(stored, 10) : MAX_FREE_USES;
+      setRemainingUses(count);
+    }
+  }, [user]);
 
   const validPosts = posts.filter(p => p.trim().length > 0);
 
@@ -62,33 +71,45 @@ export default function Analyze() {
       setStep('計算語意距離與集群分組...');
       const { points2D, labels, clusterCount } = runClientAnalysis(result.embeddings);
       
-      // Step 3: Calculate health score
+      // Step 3: Get cluster info for topic analysis
+      const clusters: { id: number; posts: string[] }[] = [];
+      for (let i = 0; i < clusterCount; i++) {
+        const clusterPostIndices = labels
+          .map((label, idx) => label === i ? idx : -1)
+          .filter(idx => idx !== -1);
+        const clusterPosts = clusterPostIndices.map(idx => validPosts[idx]);
+        clusters.push({ id: i, posts: clusterPosts });
+      }
+      
+      // Step 4: Get topic analysis from API
+      setStep('AI 正在生成建議...');
+      const topicAnalysis = await getTopicAnalysisWithClusters(validPosts, clusters);
+      
+      // Step 5: Calculate health score
       setStep('計算健康分數...');
       const healthScore = calculateHealthScore(result.embeddings, labels, clusterCount);
       
-      // Step 4: Store result and redirect
-      setStep('生成分析報告...');
-      
+      // Step 6: Build final result
       const analysisResult: AnalysisResult = {
         ...result,
         points2D,
         labels,
         topicAnalysis: {
-          ...result.topicAnalysis,
+          ...topicAnalysis,
           healthScore,
         },
-        remainingUses: result.remainingUses,
       };
       
-      // Save to localStorage for now (in production, would save to DB)
-      const analyses = JSON.parse(localStorage.getItem('threadsiq_analyses') || '[]');
-      analyses.unshift({
+      // Save to localStorage
+      const storageKey = `threadsiq_analyses_${user.id}`;
+      const existingAnalyses = JSON.parse(localStorage.getItem(storageKey) || '[]');
+      existingAnalyses.unshift({
         id: result.id,
         posts: validPosts,
         result: analysisResult,
         createdAt: new Date().toISOString(),
       });
-      localStorage.setItem('threadsiq_analyses', JSON.stringify(analyses));
+      localStorage.setItem(storageKey, JSON.stringify(existingAnalyses));
       
       setRemainingUses(result.remainingUses);
       navigate(`/report/${result.id}`);

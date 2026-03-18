@@ -1,5 +1,5 @@
-// Client-side UMAP + DBSCAN analysis
-// Note: UMAP is loaded dynamically to reduce bundle size
+// @ts-ignore - umap-js type issue
+import UMAP from 'umap-js';
 
 // Simple DBSCAN implementation
 class DBSCAN {
@@ -78,41 +78,23 @@ class DBSCAN {
   }
 }
 
-// Simple UMAP-like dimensionality reduction using t-SNE-like approach
+// UMAP dimensionality reduction
 function reduceDimensionality(embeddings: number[][], nComponents: number = 2): number[][] {
   const n = embeddings.length;
+  
   if (n <= nComponents) {
     return embeddings.map(e => [...e.slice(0, nComponents)]);
   }
 
-  // Use PCA-like approach for dimensionality reduction
-  // First compute mean
-  const mean = new Array(embeddings[0].length).fill(0);
-  for (const e of embeddings) {
-    for (let i = 0; i < e.length; i++) {
-      mean[i] += e[i] / n;
-    }
-  }
+  // Use UMAP for dimensionality reduction
+  const umap = new UMAP({
+    nComponents,
+    nNeighbors: Math.min(15, n - 1),
+    minDist: 0.1,
+    spread: 1.0,
+  } as any);
 
-  // Center the data
-  const centered = embeddings.map(e => e.map((v, i) => v - mean[i]));
-
-  // Compute covariance matrix (simplified - just take first nComponents dimensions)
-  // For a proper implementation, we'd use SVD, but this works for visualization
-  const result: number[][] = [];
-
-  for (const e of centered) {
-    const reduced = e.slice(0, nComponents);
-    // Normalize to reasonable scale
-    const norm = Math.sqrt(reduced.reduce((s, v) => s + v * v, 0));
-    if (norm > 0) {
-      result.push(reduced.map(v => v / norm * 5)); // Scale to roughly [-5, 5]
-    } else {
-      result.push(reduced);
-    }
-  }
-
-  return result;
+  return umap.fit(embeddings);
 }
 
 export interface AnalysisResult {
@@ -124,7 +106,7 @@ export interface AnalysisResult {
 }
 
 export function runAnalysis(embeddings: number[][]): AnalysisResult {
-  // Step 1: Reduce dimensionality
+  // Step 1: Reduce dimensionality with UMAP
   const points2D = reduceDimensionality(embeddings, 2);
 
   // Step 2: Run DBSCAN
