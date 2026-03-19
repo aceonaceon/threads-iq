@@ -30,11 +30,20 @@ function getStoredToken(): string | null {
   return localStorage.getItem('threadsiq_token');
 }
 
+function base64Decode(b64: string): string {
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return new TextDecoder().decode(bytes);
+}
+
 function getUserIdFromToken(): string | null {
   const token = getStoredToken();
   if (!token) return null;
   try {
-    const payload = JSON.parse(atob(token.split('.')[0]));
+    const payload = JSON.parse(base64Decode(token.split('.')[0]));
     return payload.sub;
   } catch {
     return null;
