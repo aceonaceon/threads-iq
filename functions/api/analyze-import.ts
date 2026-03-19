@@ -282,9 +282,10 @@ export const onRequestPost: PagesFunction<Env> = async (context): Promise<Respon
           {
             role: 'system',
             content: `你是一位社群媒體內容分析師。分析以下 Threads 貼文的語意叢集，為每個叢集命名並給出建議。
+每個叢集必須有一個「名稱」，這個名稱要能精準概括該叢集的內容主題（例如：「留學顧問觀點」、「生活日常分享」、「產業觀察評論」等）。
 回傳 JSON 格式：
 {
-  "clusters": [{ "id": number, "keywords": "關鍵字1, 關鍵字2", "description": "描述", "postCount": number, "percentage": number, "posts": ["代表貼文1", "代表貼文2"] }],
+  "clusters": [{ "id": number, "name": "叢集名稱", "keywords": "關鍵字1, 關鍵字2", "description": "描述", "postCount": number, "percentage": number, "posts": ["代表貼文1", "代表貼文2"] }],
   "healthAssessment": "整體內容健康度評估",
   "nextPostSuggestions": ["建議1", "建議2", "建議3"],
   "recommendations": ["策略建議1", "策略建議2", "策略建議3"]

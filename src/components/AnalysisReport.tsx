@@ -97,7 +97,7 @@ export default function AnalysisReport({ result, posts }: AnalysisReportProps) {
                       className="w-4 h-4 rounded-full"
                       style={{ backgroundColor: CLUSTER_COLORS[idx % CLUSTER_COLORS.length] }}
                     />
-                    <span className="font-medium">{cluster?.keywords || `主題 ${idx + 1}`}</span>
+                    <span className="font-medium">{cluster?.name || cluster?.keywords || `主題 ${idx + 1}`}</span>
                     <span className="text-gray-500 text-sm">
                       ({clusterPosts.length} 篇，{Math.round(clusterPosts.length / posts.length * 100)}%)
                     </span>

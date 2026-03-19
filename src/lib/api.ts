@@ -6,6 +6,7 @@ export interface Post {
 
 export interface Cluster {
   id: number;
+  name?: string;
   keywords: string;
   description?: string;
   postCount: number;
