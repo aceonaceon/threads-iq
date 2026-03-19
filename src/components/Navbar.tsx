@@ -2,6 +2,9 @@ import { Link, useLocation } from 'react-router-dom';
 import { useState } from 'react';
 import { useAuth } from '../lib/auth';
 
+// Admin user ID - matches env variable ADMIN_USER_ID
+const ADMIN_USER_ID = 'Ua98ecd52424d5d82c0091d52bb9afce4';
+
 export default function Navbar() {
   const { user, isAuthenticated, logout, login } = useAuth();
   const location = useLocation();
@@ -10,12 +13,16 @@ export default function Navbar() {
   const isActive = (path: string) => location.pathname === path;
   const totalRemaining = user ? (user.weeklyRemaining || 0) + (user.bonusUses || 0) : 0;
 
+  // Check if current user is admin
+  const isAdmin = isAuthenticated && user && user.id === ADMIN_USER_ID;
+
   const navLinks = isAuthenticated ? [
     { path: '/analyze', label: '分析' },
     { path: '/draft-check', label: '發文前檢查' },
     { path: '/thread-generator', label: '串文引擎' },
     { path: '/history', label: '歷史記錄' },
     { path: '/affiliate', label: '推薦計畫' },
+    ...(isAdmin ? [{ path: '/admin', label: '管理後台' }] : []),
   ] : [];
 
   // Blog link is always visible
