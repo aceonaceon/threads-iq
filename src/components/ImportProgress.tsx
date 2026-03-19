@@ -84,23 +84,47 @@ export default function ImportProgress({ onImportComplete, onError }: ImportProg
           }
         }
 
-        // Import completed
+        // Phase A completed - check if embeddings are done
         if (data.phase_a_completed_at) {
-          clearInterval(interval);
-          setStatus('completed');
-          setProgress(data.total_with_embedding || data.total_fetched);
+          const totalPosts = data.total_fetched || 0;
+          const withEmbedding = data.total_with_embedding || 0;
           
-          // Get post count and date range from response
-          setPostCount(data.total_with_embedding || data.total_fetched);
-          if (data.earliest_post && data.latest_post) {
-            setDateRange({
-              earliest: data.earliest_post,
-              latest: data.latest_post,
-            });
+          if (withEmbedding < totalPosts) {
+            // Embeddings not done - trigger computation
+            setStatus('processing');
+            setProgress(withEmbedding);
+            setTarget(totalPosts);
+            
+            // Call embeddings endpoint
+            try {
+              const embRes = await fetch('/api/import/embeddings', {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}` },
+              });
+              const embData = await embRes.json();
+              if (embData.status === 'in_progress') {
+                // More to process, keep polling
+                setProgress(totalPosts - (embData.remaining || 0));
+              }
+            } catch (e) {
+              console.error('Embedding computation error:', e);
+            }
+          } else {
+            // All done!
+            clearInterval(interval);
+            setStatus('completed');
+            setProgress(withEmbedding);
+            setPostCount(withEmbedding);
+            
+            if (data.earliest_post && data.latest_post) {
+              setDateRange({
+                earliest: data.earliest_post,
+                latest: data.latest_post,
+              });
+            }
+            
+            onImportComplete([], data);
           }
-          
-          // Call onImportComplete with posts data
-          onImportComplete([], data);
         }
 
         // Paused (rate limit)

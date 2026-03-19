@@ -149,12 +149,7 @@ export default function Analyze() {
       const postsWithEmbeddings = importedPosts.filter((p: any) => p.embedding);
       const postsWithoutEmbeddings = importedPosts.filter((p: any) => !p.embedding && p.text?.trim());
       
-      // Use all text posts (no MAX_POSTS limit for premium users)
-      const postTexts = importedPosts
-        .map((p: any) => p.text)
-        .filter((t: string) => t && t.trim().length > 0);
-      
-      setPosts(postTexts);
+      // Don't set posts into manual input boxes - keep import flow separate
       
       // Step 2: Use D1 embeddings directly, only compute missing ones
       setStep('正在分析你的貼文語意...');
