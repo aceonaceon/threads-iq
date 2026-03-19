@@ -12,6 +12,7 @@ import DraftCheck from './pages/DraftCheck';
 import Blog from './pages/Blog';
 import BlogPost from './pages/BlogPost';
 import Admin from './pages/Admin';
+import Posts from './pages/Posts';
 import { AuthProvider, useAuth } from './lib/auth';
 
 // Auth success handler component
@@ -79,6 +80,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Analyze />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/posts" 
+        element={
+          <ProtectedRoute>
+            <Posts />
           </ProtectedRoute>
         } 
       />

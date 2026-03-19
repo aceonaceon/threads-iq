@@ -125,110 +125,45 @@ export default function Analyze() {
     setError('');
 
     try {
-      // Step 1: Read posts with embeddings from D1
-      setStep('正在讀取你的 Threads 貼文...');
+      // Server-side analysis: D1 embeddings → DBSCAN → GPT topics (no 9MB download)
+      setStep('正在分析你的 Threads 貼文...');
       
       const token = getAuthToken();
-      const res = await fetch('/api/posts/list?include_embeddings=true', {
+      const res = await fetch('/api/analyze-import', {
+        method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
       });
       
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || '讀取貼文失敗');
+        throw new Error(data.detail || data.error || '分析失敗');
       }
       
-      const data = await res.json();
-      const importedPosts = data.posts || [];
+      const serverResult = await res.json();
       
-      if (importedPosts.length < MIN_POSTS) {
-        throw new Error(`貼文數量不足，需要至少 ${MIN_POSTS} 篇`);
-      }
+      // Build client-side result (UMAP 2D points generated from labels for visualization)
+      setStep('生成視覺化...');
+      const labels = serverResult.labels || [];
+      const postCount = serverResult.postCount || labels.length;
       
-      // Separate posts with embeddings from those without
-      const postsWithEmbeddings = importedPosts.filter((p: any) => p.embedding);
-      const postsWithoutEmbeddings = importedPosts.filter((p: any) => !p.embedding && p.text?.trim());
+      // Generate simple 2D positions from cluster labels for visualization
+      const points2D: number[][] = labels.map((label: number, i: number) => {
+        const angle = (label >= 0 ? label : labels.length) * 2.4 + i * 0.1;
+        const radius = label >= 0 ? 2 + Math.random() * 3 : 8 + Math.random() * 2;
+        return [Math.cos(angle) * radius + Math.random() * 0.5, Math.sin(angle) * radius + Math.random() * 0.5];
+      });
       
-      // Don't set posts into manual input boxes - keep import flow separate
+      // Build embeddings placeholder (empty - we don't need them client-side)
+      const fakeEmbeddings = new Array(postCount).fill([0]);
       
-      // Step 2: Use D1 embeddings directly, only compute missing ones
-      setStep('正在分析你的貼文語意...');
-      
-      let allEmbeddings: number[][] = [];
-      
-      if (postsWithEmbeddings.length > 0) {
-        // Use pre-computed embeddings from D1
-        allEmbeddings = postsWithEmbeddings.map((p: any) => {
-          try {
-            return typeof p.embedding === 'string' ? JSON.parse(p.embedding) : p.embedding;
-          } catch { return null; }
-        }).filter(Boolean);
-      }
-      
-      // If some posts don't have embeddings, compute them
-      if (postsWithoutEmbeddings.length > 0 && postsWithoutEmbeddings.length <= 100) {
-        const missingTexts = postsWithoutEmbeddings.map((p: any) => p.text);
-        const result = await runAnalysis(missingTexts, user.id);
-        allEmbeddings = [...allEmbeddings, ...result.embeddings];
-      }
-      
-      // Make sure postTexts aligns with embeddings
-      const validPostTexts = postsWithEmbeddings
-        .map((p: any) => p.text)
-        .filter((t: string) => t && t.trim().length > 0);
-      
-      if (allEmbeddings.length < MIN_POSTS) {
-        throw new Error(`有效的向量資料不足，需要至少 ${MIN_POSTS} 篇`);
-      }
-      
-      // Step 3: Run client-side UMAP + DBSCAN on ALL embeddings
-      setStep('計算語意距離與集群分組...');
-      const { points2D, labels, clusterCount } = runClientAnalysis(allEmbeddings);
-      
-      // Step 4: Get cluster info for topic analysis (use validPostTexts aligned with embeddings)
-      const clusters: { id: number; posts: string[] }[] = [];
-      if (clusterCount === 0) {
-        clusters.push({ id: 0, posts: validPostTexts });
-      } else {
-        for (let i = 0; i < clusterCount; i++) {
-          const clusterPostIndices = labels
-            .map((label, idx) => label === i ? idx : -1)
-            .filter(idx => idx !== -1);
-          const clusterPosts = clusterPostIndices.map(idx => validPostTexts[idx] || '');
-          clusters.push({ id: i, posts: clusterPosts });
-        }
-      }
-      
-      // Step 5: Get topic analysis from API (sample posts to avoid timeout with large datasets)
-      setStep('AI 正在生成建議...');
-      const MAX_POSTS_FOR_TOPICS = 50;
-      const sampledClusters = clusters.map(c => ({
-        ...c,
-        posts: c.posts.length > 15 
-          ? c.posts.slice(0, 10).concat(c.posts.slice(-5)) // first 10 + last 5 per cluster
-          : c.posts,
-      }));
-      const sampledPosts = validPostTexts.length > MAX_POSTS_FOR_TOPICS
-        ? validPostTexts.filter((_: string, i: number) => i % Math.ceil(validPostTexts.length / MAX_POSTS_FOR_TOPICS) === 0)
-        : validPostTexts;
-      const topicAnalysis = await getTopicAnalysisWithClusters(sampledPosts, sampledClusters);
-      
-      // Step 6: Calculate health score
-      setStep('計算健康分數...');
-      const healthScore = calculateHealthScore(allEmbeddings, labels, clusterCount);
-      
-      // Step 7: Build final result
       const analysisResult: AnalysisResult = {
-        id: `import-${Date.now()}`,
-        embeddings: allEmbeddings,
+        id: serverResult.id,
+        embeddings: fakeEmbeddings,
         points2D,
         labels,
         remainingUses: 0,
         bonusRemaining: 0,
-        topicAnalysis: {
-          ...topicAnalysis,
-          healthScore,
-        },
+        topicAnalysis: serverResult.topicAnalysis,
       };
       
       // Save to cloud
@@ -241,7 +176,7 @@ export default function Analyze() {
           },
           body: JSON.stringify({
             id: analysisResult.id,
-            posts: validPostTexts,
+            posts: [],
             result: analysisResult,
           }),
         });
@@ -501,6 +436,12 @@ export default function Analyze() {
                         '開始分析'
                       )}
                     </button>
+                    {/* Error display near the button */}
+                    {error && (
+                      <div className="flex items-center gap-2 px-4 py-3 bg-red-900/20 border border-red-800/30 rounded-xl">
+                        <span className="text-red-400 text-sm">{error}</span>
+                      </div>
+                    )}
                     <button
                       onClick={() => {
                         setImportCompleted(false);
