@@ -18,6 +18,9 @@ export default function Navbar() {
     { path: '/affiliate', label: '推薦計畫' },
   ] : [];
 
+  // Blog link is always visible
+  const blogLink = { path: '/blog', label: '部落格' };
+
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-surface/95 backdrop-blur-sm border-b border-white/5">
       <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
@@ -28,6 +31,14 @@ export default function Navbar() {
 
         {/* Desktop nav */}
         <div className="hidden md:flex items-center gap-5">
+          <Link
+            to={blogLink.path}
+            className={`text-sm font-medium transition-colors ${
+              isActive(blogLink.path) ? 'text-accent' : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            {blogLink.label}
+          </Link>
           {navLinks.map(link => (
             <Link
               key={link.path}
@@ -74,39 +85,43 @@ export default function Navbar() {
               <span className="text-accent font-medium">{totalRemaining}</span> 次
             </div>
           )}
-          {isAuthenticated ? (
-            <button
-              onClick={() => setMenuOpen(!menuOpen)}
-              className="p-1.5 text-gray-400 hover:text-white transition-colors"
-              aria-label="選單"
-            >
-              {menuOpen ? (
-                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              ) : (
-                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                </svg>
-              )}
-            </button>
-          ) : (
-            <button
-              onClick={login}
-              className="px-3 py-1.5 bg-cta hover:bg-cta-hover text-white text-sm font-medium rounded-lg transition-colors"
-            >
-              開始使用
-            </button>
-          )}
+          <button
+            onClick={() => setMenuOpen(!menuOpen)}
+            className="p-1.5 text-gray-400 hover:text-white transition-colors"
+            aria-label="選單"
+          >
+            {menuOpen ? (
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            ) : (
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            )}
+          </button>
         </div>
       </div>
 
       {/* Mobile dropdown menu */}
-      {menuOpen && isAuthenticated && (
+      {menuOpen && (
         <div className="md:hidden border-t border-white/5 bg-surface/98 backdrop-blur-sm">
           <div className="max-w-6xl mx-auto px-4 py-3 space-y-1">
-            {/* User info */}
-            {user && (
+            {/* Blog link - always visible */}
+            <Link
+              to={blogLink.path}
+              onClick={() => setMenuOpen(false)}
+              className={`block px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                isActive(blogLink.path)
+                  ? 'text-accent bg-accent/10'
+                  : 'text-gray-300 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              {blogLink.label}
+            </Link>
+
+            {/* User info - only show when authenticated */}
+            {isAuthenticated && user && (
               <div className="flex items-center gap-3 px-3 py-2.5 mb-2">
                 {user.avatarUrl ? (
                   <img src={user.avatarUrl} alt={user.name} className="w-9 h-9 rounded-full" />
@@ -124,7 +139,8 @@ export default function Navbar() {
               </div>
             )}
 
-            {navLinks.map(link => (
+            {/* Nav links - only show when authenticated */}
+            {isAuthenticated && navLinks.map(link => (
               <Link
                 key={link.path}
                 to={link.path}
@@ -139,12 +155,14 @@ export default function Navbar() {
               </Link>
             ))}
 
-            <button
-              onClick={() => { logout(); setMenuOpen(false); }}
-              className="w-full text-left px-3 py-2.5 rounded-lg text-sm text-gray-500 hover:text-white hover:bg-white/5 transition-colors"
-            >
-              登出
-            </button>
+            {isAuthenticated && (
+              <button
+                onClick={() => { logout(); setMenuOpen(false); }}
+                className="w-full text-left px-3 py-2.5 rounded-lg text-sm text-gray-500 hover:text-white hover:bg-white/5 transition-colors"
+              >
+                登出
+              </button>
+            )}
           </div>
         </div>
       )}

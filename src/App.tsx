@@ -9,6 +9,8 @@ import Login from './pages/Login';
 import Affiliate from './pages/Affiliate';
 import ThreadGenerator from './pages/ThreadGenerator';
 import DraftCheck from './pages/DraftCheck';
+import Blog from './pages/Blog';
+import BlogPost from './pages/BlogPost';
 import { AuthProvider, useAuth } from './lib/auth';
 
 // Auth success handler component
@@ -67,6 +69,10 @@ function AppRoutes() {
       <Route path="/login" element={<Login />} />
       <Route path="/auth/success" element={<AuthSuccessHandler />} />
       <Route path="/auth/callback" element={<AuthSuccessHandler />} />
+      {/* Public blog routes - no auth required */}
+      <Route path="/blog" element={<Blog />} />
+      <Route path="/blog/:slug" element={<BlogPost />} />
+      {/* Protected routes */}
       <Route 
         path="/analyze" 
         element={
