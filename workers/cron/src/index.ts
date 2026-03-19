@@ -15,11 +15,10 @@ interface Env {
 async function processPhaseB(env: Env): Promise<{ processed: number; details: string[] }> {
   const details: string[] = [];
   
-  // Find all active Phase B jobs
+  // Find all active Phase B jobs (cursor can be empty = start from beginning)
   const jobs = await env.THREADSIQ_DB.prepare(
     `SELECT * FROM import_jobs 
      WHERE status IN ('phase_b', 'paused')
-     AND cursor IS NOT NULL AND cursor != ''
      ORDER BY started_at ASC`
   ).all<any>();
   
@@ -58,11 +57,11 @@ async function processPhaseB(env: Env): Promise<{ processed: number; details: st
       continue;
     }
     
-    let cursor = job.cursor;
+    let cursor = job.cursor || '';
     let postsFetched = job.total_fetched || 0;
     let hasMore = true;
     let batchCount = 0;
-    const maxBatchesPerRun = 4; // Process up to 4 pages (100 posts) per cron run per user
+    const maxBatchesPerRun = 20; // Process up to 20 pages (500 posts) per cron run per user (paid plan: 1000 subrequests)
     const startTime = Date.now();
     
     while (hasMore && batchCount < maxBatchesPerRun && (Date.now() - startTime) < 25000) {
@@ -104,7 +103,7 @@ async function processPhaseB(env: Env): Promise<{ processed: number; details: st
         break;
       }
       
-      // Batch insert posts
+      // Batch insert posts (track new vs duplicate)
       const stmts = postsData.data.map((post: any) =>
         env.THREADSIQ_DB.prepare(
           `INSERT INTO posts (user_id, threads_post_id, text, posted_at, media_type, permalink)
@@ -112,7 +111,8 @@ async function processPhaseB(env: Env): Promise<{ processed: number; details: st
            ON CONFLICT(threads_post_id) DO NOTHING`
         ).bind(job.user_id, post.id, post.text || '', post.timestamp, post.media_type || null, post.permalink || '')
       );
-      await env.THREADSIQ_DB.batch(stmts);
+      const batchResults = await env.THREADSIQ_DB.batch(stmts);
+      const newInserts = batchResults.reduce((sum, r) => sum + (r.meta.changes || 0), 0);
       
       postsFetched += postsData.data.length;
       batchCount++;
