@@ -310,13 +310,25 @@ export const onRequestPost: PagesFunction<Env> = async (context): Promise<Respon
     // Calculate health score
     const healthScore = calculateHealthScore(embeddings, labels, clusterCount);
     
-    // Return complete analysis result (no UMAP - frontend can compute if needed from labels)
+    // Generate 2D layout from cluster labels (simple radial layout per cluster)
+    const points2D: number[][] = labels.map((label: number, i: number) => {
+      const clusterAngle = (label >= 0 ? label : clusterCount) * (2 * Math.PI / (clusterCount + 1));
+      const jitter = (i * 0.618) % 1; // golden ratio jitter
+      const radius = label >= 0 ? 3 + jitter * 2 : 8 + jitter * 2;
+      return [
+        Math.cos(clusterAngle + jitter * 0.5) * radius,
+        Math.sin(clusterAngle + jitter * 0.5) * radius,
+      ];
+    });
+    
     return new Response(JSON.stringify({
       id: `import-${Date.now()}`,
       postCount: embeddings.length,
+      posts: validTexts,
       labels,
       clusterCount,
       healthScore,
+      points2D,
       topicAnalysis: {
         ...topicAnalysis,
         healthScore,

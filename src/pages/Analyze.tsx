@@ -141,19 +141,12 @@ export default function Analyze() {
       
       const serverResult = await res.json();
       
-      // Build client-side result (UMAP 2D points generated from labels for visualization)
       setStep('生成視覺化...');
       const labels = serverResult.labels || [];
+      const points2D = serverResult.points2D || [];
+      const serverPosts = serverResult.posts || [];
       const postCount = serverResult.postCount || labels.length;
       
-      // Generate simple 2D positions from cluster labels for visualization
-      const points2D: number[][] = labels.map((label: number, i: number) => {
-        const angle = (label >= 0 ? label : labels.length) * 2.4 + i * 0.1;
-        const radius = label >= 0 ? 2 + Math.random() * 3 : 8 + Math.random() * 2;
-        return [Math.cos(angle) * radius + Math.random() * 0.5, Math.sin(angle) * radius + Math.random() * 0.5];
-      });
-      
-      // Build embeddings placeholder (empty - we don't need them client-side)
       const fakeEmbeddings = new Array(postCount).fill([0]);
       
       const analysisResult: AnalysisResult = {
@@ -166,7 +159,7 @@ export default function Analyze() {
         topicAnalysis: serverResult.topicAnalysis,
       };
       
-      // Save to cloud
+      // Save to cloud (include posts text for report display)
       if (token) {
         const saveResponse = await fetch('/api/analyses/save', {
           method: 'POST',
@@ -176,7 +169,7 @@ export default function Analyze() {
           },
           body: JSON.stringify({
             id: analysisResult.id,
-            posts: [],
+            posts: serverPosts,
             result: analysisResult,
           }),
         });
