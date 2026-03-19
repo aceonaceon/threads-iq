@@ -34,7 +34,7 @@ function getUserIdFromToken(): string | null {
   const token = getStoredToken();
   if (!token) return null;
   try {
-    const payload = JSON.parse(atob(token.split('.')[1]));
+    const payload = JSON.parse(atob(token.split('.')[0]));
     return payload.sub;
   } catch {
     return null;
