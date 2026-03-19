@@ -63,11 +63,12 @@ function getAuthToken(request: Request): string | null {
   return null;
 }
 
-async function verifyAdmin(token: string, env: Env): Promise<TokenPayload | null> {
+async function verifyAdmin(token: string, env: Env): Promise<{ payload: TokenPayload | null; reason?: string }> {
   const payload = await verifyToken(token, env.LINE_CHANNEL_SECRET);
-  if (!payload) return null;
-  if (payload.sub !== env.ADMIN_USER_ID) return null;
-  return payload;
+  if (!payload) return { payload: null, reason: 'token_verify_failed' };
+  if (!env.ADMIN_USER_ID) return { payload: null, reason: 'admin_user_id_not_set' };
+  if (payload.sub !== env.ADMIN_USER_ID) return { payload: null, reason: `sub_mismatch:${payload.sub}_vs_${env.ADMIN_USER_ID}` };
+  return { payload };
 }
 
 // GET aggregate statistics
@@ -88,10 +89,11 @@ export const onRequestGet: PagesFunction<Env> = async (context): Promise<Respons
     return new Response(JSON.stringify({ error: '請先登入' }), { status: 401, headers });
   }
 
-  const adminPayload = await verifyAdmin(token, context.env);
-  if (!adminPayload) {
-    return new Response(JSON.stringify({ error: '無權限' }), { status: 403, headers });
+  const adminResult = await verifyAdmin(token, context.env);
+  if (!adminResult.payload) {
+    return new Response(JSON.stringify({ error: '無權限', reason: adminResult.reason }), { status: 403, headers });
   }
+  const adminPayload = adminResult.payload;
 
   // List all user keys
   const listResult = await context.env.THREADSIQ_STORE.list({ prefix: 'user:' });

@@ -68,18 +68,40 @@ export const onRequestGet: PagesFunction<Env> = async (context): Promise<Respons
     return new Response(JSON.stringify({ error: 'Invalid token' }), { status: 401, headers });
   }
 
+  // Get user data to check plan
+  const userKey = `user:${payload.sub}`;
+  const userStr = await context.env.THREADSIQ_STORE.get(userKey);
+  let userPlan = 'free';
+  if (userStr) {
+    const userData = JSON.parse(userStr);
+    userPlan = userData.plan || 'free';
+  }
+
   // Get analyses from KV
   const analysesKey = `analyses:${payload.sub}`;
   const analysesStr = await context.env.THREADSIQ_STORE.get(analysesKey);
   
   if (!analysesStr) {
-    return new Response(JSON.stringify([]), { status: 200, headers });
+    return new Response(JSON.stringify({ analyses: [], total: 0, limited: false }), { status: 200, headers });
   }
 
-  const analyses = JSON.parse(analysesStr);
+  const allAnalyses = JSON.parse(analysesStr);
+  const totalCount = allAnalyses.length;
+  
+  // Check if user is on free plan (undefined, null, or "free")
+  const isFreePlan = !userPlan || userPlan === 'free';
+  
+  // Sort by createdAt descending (newest first)
+  const sortedAnalyses = [...allAnalyses].sort((a, b) => 
+    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+  
+  // Limit to 3 for free users
+  const limitedAnalyses = isFreePlan ? sortedAnalyses.slice(0, 3) : sortedAnalyses;
+  const isLimited = isFreePlan && totalCount > 3;
   
   // Transform to summary format
-  const summaries = analyses.map((a: any) => ({
+  const summaries = limitedAnalyses.map((a: any) => ({
     id: a.id,
     postCount: a.posts?.length || 0,
     clusterCount: a.result?.topicAnalysis?.clusters?.length || 0,
@@ -87,5 +109,9 @@ export const onRequestGet: PagesFunction<Env> = async (context): Promise<Respons
     createdAt: a.createdAt,
   }));
 
-  return new Response(JSON.stringify(summaries), { status: 200, headers });
+  return new Response(JSON.stringify({ 
+    analyses: summaries, 
+    total: totalCount,
+    limited: isLimited
+  }), { status: 200, headers });
 };

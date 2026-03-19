@@ -10,9 +10,17 @@ interface HistoryItem {
   createdAt: string;
 }
 
+interface ApiResponse {
+  analyses: HistoryItem[];
+  total: number;
+  limited: boolean;
+}
+
 export default function History() {
   const { isAuthenticated } = useAuth();
   const [analyses, setAnalyses] = useState<HistoryItem[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [isLimited, setIsLimited] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -24,8 +32,10 @@ export default function History() {
         },
       })
         .then(res => res.json())
-        .then(data => {
-          setAnalyses(data);
+        .then((data: ApiResponse) => {
+          setAnalyses(data.analyses);
+          setTotalCount(data.total);
+          setIsLimited(data.limited);
           setLoading(false);
         })
         .catch(err => {
@@ -178,6 +188,24 @@ export default function History() {
                 </Link>
               );
             })}
+
+            {/* Limited notice for free users */}
+            {isLimited && (
+              <div className="mt-6 p-4 bg-surface rounded-xl border border-gray-800">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-gray-400">免費版僅顯示最近 3 次分析記錄</span>
+                  <span className="text-xs bg-accent/20 text-accent px-2 py-1 rounded">
+                    3/{totalCount}
+                  </span>
+                </div>
+                <Link
+                  to="/#pricing"
+                  className="text-sm text-accent hover:text-accent-hover transition-colors"
+                >
+                  升級進階會員，解鎖完整歷史 →
+                </Link>
+              </div>
+            )}
           </div>
         )}
       </div>
