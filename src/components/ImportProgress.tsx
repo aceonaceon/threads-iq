@@ -46,7 +46,7 @@ export default function ImportProgress({ onImportComplete, onError }: ImportProg
           setStatus('error');
           return;
         }
-        throw new Error(data.error || '匯入失敗');
+        throw new Error(data.detail || data.error || '匯入失敗');
       }
 
       setStatus('importing');
