@@ -105,23 +105,33 @@ export const onRequestGet: PagesFunction<Env> = async (context): Promise<Respons
     
     const totalCount = countResult?.count || 0;
     
+    // Check if embeddings should be included
+    const url = new URL(context.request.url);
+    const includeEmbeddings = url.searchParams.get('include_embeddings') === 'true';
+    
     // Format posts for response
-    const formattedPosts = postsList.map((post: any) => ({
-      id: post.id,
-      threads_post_id: post.threads_post_id,
-      text: post.text,
-      posted_at: post.posted_at,
-      media_type: post.media_type,
-      permalink: post.permalink,
-      has_embedding: !!post.embedding,
-      insights: {
-        views: post.views || 0,
-        likes: post.likes || 0,
-        replies: post.replies || 0,
-        reposts: post.reposts || 0,
-        quotes: post.quotes || 0,
-      },
-    }));
+    const formattedPosts = postsList.map((post: any) => {
+      const formatted: any = {
+        id: post.id,
+        threads_post_id: post.threads_post_id,
+        text: post.text,
+        posted_at: post.posted_at,
+        media_type: post.media_type,
+        permalink: post.permalink,
+        has_embedding: !!post.embedding,
+        insights: {
+          views: post.views || 0,
+          likes: post.likes || 0,
+          replies: post.replies || 0,
+          reposts: post.reposts || 0,
+          quotes: post.quotes || 0,
+        },
+      };
+      if (includeEmbeddings && post.embedding) {
+        formatted.embedding = post.embedding;
+      }
+      return formatted;
+    });
     
     return new Response(JSON.stringify({
       posts: formattedPosts,

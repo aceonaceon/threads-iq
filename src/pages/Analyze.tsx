@@ -125,11 +125,11 @@ export default function Analyze() {
     setError('');
 
     try {
-      // Step 1: Read posts from D1 via API
+      // Step 1: Read posts with embeddings from D1
       setStep('正在讀取你的 Threads 貼文...');
       
       const token = getAuthToken();
-      const res = await fetch('/api/posts/list', {
+      const res = await fetch('/api/posts/list?include_embeddings=true', {
         headers: { Authorization: `Bearer ${token}` },
       });
       
@@ -145,51 +145,81 @@ export default function Analyze() {
         throw new Error(`貼文數量不足，需要至少 ${MIN_POSTS} 篇`);
       }
       
-      // Extract text from imported posts
+      // Separate posts with embeddings from those without
+      const postsWithEmbeddings = importedPosts.filter((p: any) => p.embedding);
+      const postsWithoutEmbeddings = importedPosts.filter((p: any) => !p.embedding && p.text?.trim());
+      
+      // Use all text posts (no MAX_POSTS limit for premium users)
       const postTexts = importedPosts
         .map((p: any) => p.text)
-        .filter((t: string) => t && t.trim().length > 0)
-        .slice(0, MAX_POSTS);
+        .filter((t: string) => t && t.trim().length > 0);
       
       setPosts(postTexts);
       
-      // Step 2: Get embeddings from server (includes usage check)
+      // Step 2: Use D1 embeddings directly, only compute missing ones
       setStep('正在分析你的貼文語意...');
       
-      const result = await runAnalysis(postTexts, user.id);
+      let allEmbeddings: number[][] = [];
       
-      // Step 3: Run client-side UMAP + DBSCAN
+      if (postsWithEmbeddings.length > 0) {
+        // Use pre-computed embeddings from D1
+        allEmbeddings = postsWithEmbeddings.map((p: any) => {
+          try {
+            return typeof p.embedding === 'string' ? JSON.parse(p.embedding) : p.embedding;
+          } catch { return null; }
+        }).filter(Boolean);
+      }
+      
+      // If some posts don't have embeddings, compute them
+      if (postsWithoutEmbeddings.length > 0 && postsWithoutEmbeddings.length <= 100) {
+        const missingTexts = postsWithoutEmbeddings.map((p: any) => p.text);
+        const result = await runAnalysis(missingTexts, user.id);
+        allEmbeddings = [...allEmbeddings, ...result.embeddings];
+      }
+      
+      // Make sure postTexts aligns with embeddings
+      const validPostTexts = postsWithEmbeddings
+        .map((p: any) => p.text)
+        .filter((t: string) => t && t.trim().length > 0);
+      
+      if (allEmbeddings.length < MIN_POSTS) {
+        throw new Error(`有效的向量資料不足，需要至少 ${MIN_POSTS} 篇`);
+      }
+      
+      // Step 3: Run client-side UMAP + DBSCAN on ALL embeddings
       setStep('計算語意距離與集群分組...');
-      const { points2D, labels, clusterCount } = runClientAnalysis(result.embeddings);
+      const { points2D, labels, clusterCount } = runClientAnalysis(allEmbeddings);
       
-      // Step 4: Get cluster info for topic analysis
+      // Step 4: Get cluster info for topic analysis (use validPostTexts aligned with embeddings)
       const clusters: { id: number; posts: string[] }[] = [];
       if (clusterCount === 0) {
-        // Fallback: treat all posts as one cluster
-        clusters.push({ id: 0, posts: postTexts });
+        clusters.push({ id: 0, posts: validPostTexts });
       } else {
         for (let i = 0; i < clusterCount; i++) {
           const clusterPostIndices = labels
             .map((label, idx) => label === i ? idx : -1)
             .filter(idx => idx !== -1);
-          const clusterPosts = clusterPostIndices.map(idx => postTexts[idx]);
+          const clusterPosts = clusterPostIndices.map(idx => validPostTexts[idx] || '');
           clusters.push({ id: i, posts: clusterPosts });
         }
       }
       
       // Step 5: Get topic analysis from API
       setStep('AI 正在生成建議...');
-      const topicAnalysis = await getTopicAnalysisWithClusters(postTexts, clusters);
+      const topicAnalysis = await getTopicAnalysisWithClusters(validPostTexts, clusters);
       
       // Step 6: Calculate health score
       setStep('計算健康分數...');
-      const healthScore = calculateHealthScore(result.embeddings, labels, clusterCount);
+      const healthScore = calculateHealthScore(allEmbeddings, labels, clusterCount);
       
       // Step 7: Build final result
       const analysisResult: AnalysisResult = {
-        ...result,
+        id: `import-${Date.now()}`,
+        embeddings: allEmbeddings,
         points2D,
         labels,
+        remainingUses: 0,
+        bonusRemaining: 0,
         topicAnalysis: {
           ...topicAnalysis,
           healthScore,
@@ -205,8 +235,8 @@ export default function Analyze() {
             'Authorization': `Bearer ${token}`,
           },
           body: JSON.stringify({
-            id: result.id,
-            posts: postTexts,
+            id: analysisResult.id,
+            posts: validPostTexts,
             result: analysisResult,
           }),
         });
@@ -223,7 +253,7 @@ export default function Analyze() {
         }
       }
       
-      navigate(`/report/${result.id}`);
+      navigate(`/report/${analysisResult.id}`);
     } catch (err: any) {
       // Handle usage exceeded error
       if (err.message === 'usage_exceeded' || (err.response?.data?.error === 'usage_exceeded')) {
