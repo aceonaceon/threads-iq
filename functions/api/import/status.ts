@@ -37,6 +37,14 @@ export const onRequestGet: PagesFunction<Env> = async (context): Promise<Respons
       }), { status: 200, headers });
     }
     
+    // Get user's plan for visibility cap
+    const userStr = await context.env.THREADSIQ_STORE.get(`user:${lineUserId}`);
+    const userData = userStr ? JSON.parse(userStr) : {};
+    const plan = userData.plan || 'free';
+    
+    // Calculate plan-based visible limits
+    const maxVisible = plan === 'free' ? 30 : plan === 'creator' ? 300 : totalPosts;
+    
     // Get actual counts from D1 (live, not stale job record)
     const countResult = await context.env.THREADSIQ_DB.prepare(
       `SELECT 
@@ -50,6 +58,10 @@ export const onRequestGet: PagesFunction<Env> = async (context): Promise<Respons
     const totalPosts = countResult?.total_posts || 0;
     const withEmbedding = countResult?.with_embedding || 0;
     
+    // Cap counts by plan (don't leak Phase B data to non-pro users)
+    const visiblePosts = Math.min(totalPosts, maxVisible);
+    const visibleWithEmbedding = Math.min(withEmbedding, maxVisible);
+    
     return new Response(JSON.stringify({
       status: job.status,
       phase: job.phase,
@@ -61,10 +73,11 @@ export const onRequestGet: PagesFunction<Env> = async (context): Promise<Respons
       error: job.error,
       cursor: job.cursor,
       rate_limit_paused_until: job.rate_limit_paused_until,
-      post_count: totalPosts,
-      total_with_embedding: withEmbedding,
+      post_count: visiblePosts,
+      total_with_embedding: visibleWithEmbedding,
       earliest_post: countResult?.earliest_post,
       latest_post: countResult?.latest_post,
+      plan,
     }), { status: 200, headers });
     
   } catch (error) {
