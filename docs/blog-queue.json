@@ -1,0 +1,34 @@
+{
+  "note": "部落格文章寫作隊列。每次 sub-agent 完成一篇，自動讀取此檔案，dispatch 下一篇。",
+  "completed": [
+    "a1-creator-embedding",
+    "a2-semantic-analysis",
+    "b1-patent-us10579688",
+    "b3-patent-us20190095961",
+    "c1-why-good-posts-fail",
+    "c5-embedding-diagnosis",
+    "d1-analyze-others-accounts"
+  ],
+  "current": "a3-semantic-cluster",
+  "pending": [
+    "a4-semantic-neighbor",
+    "a5-semantic-drift",
+    "b2-patent-us10558714",
+    "b4-patent-us9336553",
+    "b5-patent-us9582786",
+    "b6-patent-us8402094",
+    "c2-warmup-test-guide",
+    "c3-thread-series-multiplier",
+    "a6-what-is-embedding",
+    "c4-viral-post-48h-plan",
+    "d2-draft-check-guide",
+    "d3-brand-account-strategy",
+    "e1-health-score-guide",
+    "e2-off-topic-posts",
+    "e3-hook-scoring",
+    "e4-content-cannibalization",
+    "e5-new-account-strategy",
+    "e6-semantic-decay",
+    "e7-golden-window"
+  ]
+}

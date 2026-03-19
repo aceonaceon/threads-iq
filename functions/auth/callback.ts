@@ -116,13 +116,13 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
         userData.referralCode = await generateReferralCode(profile.userId, context.env.LINE_CHANNEL_SECRET);
       }
 
-      // Handle referral logic for new users
-      if (isNewUser && refCode) {
+      // Handle referral logic - applies to any user who hasn't been referred yet
+      if (refCode && !userData.referredBy) {
         // Look up referrer by ref code
         const referrerId = await context.env.THREADSIQ_STORE.get(`ref:${refCode}`);
         
         if (referrerId && referrerId !== profile.userId) {
-          // Set new user's referredBy and bonus
+          // Set user's referredBy and bonus
           userData.referredBy = referrerId;
           userData.bonusUses = (userData.bonusUses || 0) + 10;
 
@@ -138,7 +138,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
             const referralListStr = await context.env.THREADSIQ_STORE.get(referralListKey);
             let referralList: any[] = [];
             if (referralListStr) {
-              referralList = JSON.parse(referrerListStr);
+              referralList = JSON.parse(referralListStr);
             }
             referralList.push({
               userId: profile.userId,
