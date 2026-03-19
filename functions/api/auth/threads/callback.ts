@@ -21,12 +21,14 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
       return Response.redirect('https://threads-iq.pages.dev/analyze?threads_auth=no_code', 302);
     }
 
-    // Decode state to get LINE user ID
+    // Decode state to get LINE user ID and LINE token
     let lineUserId = '';
+    let lineToken = '';
     if (state) {
       try {
         const stateObj = JSON.parse(atob(state));
         lineUserId = stateObj.lineUserId || '';
+        lineToken = stateObj.lineToken || '';
       } catch (e) {
         console.error('Failed to parse state:', e);
       }
@@ -105,8 +107,9 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
 
     console.log(`Threads token stored for user: ${lineUserId}`);
 
-    // Redirect back to analyze page with success
-    return Response.redirect('https://threads-iq.pages.dev/analyze?threads_auth=success', 302);
+    // Redirect back to analyze page with success + LINE token for session recovery
+    const tokenHash = lineToken ? `#token=${encodeURIComponent(lineToken)}` : '';
+    return Response.redirect(`https://threads-iq.pages.dev/analyze?threads_auth=success${tokenHash}`, 302);
   } catch (error) {
     console.error('Threads callback error:', error);
     return Response.redirect('https://threads-iq.pages.dev/analyze?threads_auth=error', 302);

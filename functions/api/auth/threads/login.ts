@@ -47,9 +47,10 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     });
   }
 
-  // Build state object
+  // Build state object (include LINE JWT token for session recovery after redirect)
   const stateObj = {
     lineUserId,
+    lineToken: token,
     csrf: crypto.randomUUID(),
   };
   const state = btoa(JSON.stringify(stateObj));
