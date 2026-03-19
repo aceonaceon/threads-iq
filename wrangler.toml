@@ -13,3 +13,8 @@ ADMIN_USER_ID = "Ua98ecd52424d5d82c0091d52bb9afce4"
 [[kv_namespaces]]
 binding = "THREADSIQ_STORE"
 id = "a5ce9c7ba11149f99c2cfe3ec63f1a8b"
+
+[[d1_databases]]
+binding = "THREADSIQ_DB"
+database_name = "threadsiq"
+database_id = "1e02d028-a720-4d7c-b7b7-0aaa279959f9"
