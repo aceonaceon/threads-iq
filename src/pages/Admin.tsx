@@ -220,23 +220,28 @@ export default function Admin() {
 
   const formatDate = (dateStr: string) => {
     if (!dateStr) return '-';
-    const date = new Date(dateStr);
+    // D1 stores UTC without Z suffix - ensure UTC parsing
+    const normalized = dateStr.includes('T') || dateStr.includes('Z') ? dateStr : dateStr.replace(' ', 'T') + 'Z';
+    const date = new Date(normalized);
     return date.toLocaleDateString('zh-TW', { 
       year: 'numeric', 
       month: '2-digit', 
-      day: '2-digit' 
+      day: '2-digit',
+      timeZone: 'Asia/Taipei',
     });
   };
 
   const formatDateTime = (dateStr: string) => {
     if (!dateStr) return '-';
-    const date = new Date(dateStr);
+    const normalized = dateStr.includes('T') || dateStr.includes('Z') ? dateStr : dateStr.replace(' ', 'T') + 'Z';
+    const date = new Date(normalized);
     return date.toLocaleString('zh-TW', { 
       year: 'numeric', 
       month: '2-digit', 
       day: '2-digit',
       hour: '2-digit',
       minute: '2-digit',
+      timeZone: 'Asia/Taipei',
     });
   };
 

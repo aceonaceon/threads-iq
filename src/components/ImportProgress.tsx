@@ -169,9 +169,9 @@ export default function ImportProgress({ onImportComplete, onError }: ImportProg
     return () => clearInterval(interval);
   }, [status, onImportComplete, onError]);
 
-  // Drive import forward by calling continue endpoint (only during Phase A importing)
+  // Drive import forward by calling continue endpoint (Phase A + Phase B background)
   useEffect(() => {
-    if (status !== 'importing') return;
+    if (status !== 'importing' && status !== 'processing' && status !== 'completed') return;
 
     const token = getAuthToken();
     if (!token) return;
