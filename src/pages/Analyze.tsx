@@ -199,9 +199,19 @@ export default function Analyze() {
         }
       }
       
-      // Step 5: Get topic analysis from API
+      // Step 5: Get topic analysis from API (sample posts to avoid timeout with large datasets)
       setStep('AI 正在生成建議...');
-      const topicAnalysis = await getTopicAnalysisWithClusters(validPostTexts, clusters);
+      const MAX_POSTS_FOR_TOPICS = 50;
+      const sampledClusters = clusters.map(c => ({
+        ...c,
+        posts: c.posts.length > 15 
+          ? c.posts.slice(0, 10).concat(c.posts.slice(-5)) // first 10 + last 5 per cluster
+          : c.posts,
+      }));
+      const sampledPosts = validPostTexts.length > MAX_POSTS_FOR_TOPICS
+        ? validPostTexts.filter((_: string, i: number) => i % Math.ceil(validPostTexts.length / MAX_POSTS_FOR_TOPICS) === 0)
+        : validPostTexts;
+      const topicAnalysis = await getTopicAnalysisWithClusters(sampledPosts, sampledClusters);
       
       // Step 6: Calculate health score
       setStep('計算健康分數...');
