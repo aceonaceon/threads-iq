@@ -1,5 +1,5 @@
 {
-  "completed": ["a1","a2","b1","b3","c1","c5","d1","a3","a4","a5","b2","b4","b5","b6","c2","c3","a6","c4","d2-draft-check-guide"],
-  "current": "d3-brand-account-strategy",
-  "pending": ["d4-feed-analysis","e1-health-score-guide","e2-off-topic-posts","e3-hook-scoring","e4-content-cannibalization","e5-new-account-strategy","e6-semantic-decay","e7-golden-window"]
+  "completed": ["a1","a2","b1","b3","c1","c5","d1","a3","a4","a5","b2","b4","b5","b6","c2","c3","a6","c4","d2","d3","d4-feed-analysis"],
+  "current": "e1-health-score-guide",
+  "pending": ["e2-off-topic-posts","e3-hook-scoring","e4-content-cannibalization","e5-new-account-strategy","e6-semantic-decay","e7-golden-window"]
 }
