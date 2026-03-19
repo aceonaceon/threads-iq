@@ -109,6 +109,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
         userData.totalReferrals = existing.totalReferrals || 0;
         userData.commissionBalance = existing.commissionBalance || 0;
         userData.isPaid = existing.isPaid || false;
+        userData.plan = existing.plan || 'free';
       }
 
       // Generate referral code if new user or doesn't have one

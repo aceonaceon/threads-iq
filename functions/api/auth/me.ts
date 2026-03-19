@@ -135,5 +135,6 @@ export const onRequestGet: PagesFunction<Env> = async (context): Promise<Respons
     referralCode: userData.referralCode || '',
     totalReferrals: userData.totalReferrals || 0,
     createdAt: userData.createdAt,
+    plan: userData.plan || 'free',
   }), { status: 200, headers });
 };

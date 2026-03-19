@@ -10,6 +10,7 @@ interface User {
   totalRemaining: number;
   referralCode: string;
   totalReferrals: number;
+  plan?: string;
 }
 
 interface AuthContextType {
@@ -81,6 +82,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           totalRemaining: userData.totalRemaining,
           referralCode: userData.referralCode || '',
           totalReferrals: userData.totalReferrals || 0,
+          plan: userData.plan || 'free',
         });
       } else {
         clearToken();
