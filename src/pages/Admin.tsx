@@ -63,13 +63,8 @@ export default function Admin() {
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
 
   useEffect(() => {
-    const userId = getUserIdFromToken();
-    if (userId !== ADMIN_USER_ID) {
-      setIsAdmin(false);
-      setLoading(false);
-      return;
-    }
-    setIsAdmin(true);
+    // Skip frontend token check — let the backend API decide admin status
+    // This avoids token decode issues (unicode, format differences)
     fetchData();
   }, []);
 
@@ -103,6 +98,7 @@ export default function Admin() {
       }
       const statsData = await statsRes.json();
       setStats(statsData);
+      setIsAdmin(true);
 
       // Fetch users
       const usersRes = await fetch(`${API_BASE}/api/admin/users`, {
