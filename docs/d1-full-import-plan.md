@@ -283,6 +283,65 @@ OpenAI text-embedding-3-small:
 
 ---
 
+## 延伸功能：語義鄰居（Semantic Neighbor）
+
+### 功能描述
+- 使用者可以輸入另一個帳號的貼文（手動複製貼上，就像分析自己的貼文一樣）
+- 系統比對「你的語義輪廓」vs「對方的貼文內容」
+- 輸出「語義相似度分數」+ 建議互動策略
+
+### 業務邏輯
+- **資料來源**：自己 = D1 裡的 embedding（按 plan 限制），對方 = 使用者手動輸入的 30 篇貼文
+- **比對基準**：永遠用 D1 裡最新的 embedding，不是綁定某次「分析」
+- **顯示位置**：Creator 方案的功能頁面
+
+### 評分演算法
+```
+分數 = 
+  40% × Centroid Cosine Similarity（你們的平均內容多像）
+  40% × 平均最近鄰居相似度（對方多少篇跟你像）
+  20% × 主題重疊權重（對方有多少篇落在你的主要 cluster）
+```
+
+門檻：
+- 80+：高度語義鄰居 → 建議深度互動
+- 60-80：中等 → 可以嘗試
+- 40-60：普通 → 效果一般
+- <40：不同領域
+
+### D1 Schema 擴充
+```sql
+CREATE TABLE semantic_neighbors (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id TEXT NOT NULL,
+  target_handle TEXT,
+  score REAL,
+  overlap_clusters TEXT,
+  target_posts_count INTEGER,
+  checked_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX idx_neighbors_user ON semantic_neighbors(user_id, checked_at DESC);
+```
+
+### API Endpoints
+| Endpoint | Method | 功能 |
+|----------|--------|------|
+| `/api/neighbors/analyze` | POST | 輸入對方的貼文 → 比對 → 存結果 |
+| `/api/neighbors/list` | GET | 列出已儲存的鄰居比對結果 |
+
+### UI Flow
+1. 使用者點「語義鄰居分析」
+2. 輸入對方的 @username（用於備註）
+3. 貼上對方的 30 篇貼文
+4. 系統比對 → 顯示分數 + 建議
+5. 結果存進 D1，供後續參照
+
+### 重要限制（2026-03-19 Jason 確認）
+- **Meta API 無法抓取他人的公開貼文**
+- 必須讓使用者手動複製貼上對方的貼文（跟分析自己時的手動輸入一樣）
+
+---
+
 ## 十、注意事項
 
 - **使用者不知道全量匯入**：前端只顯示「300 篇 / 6 個月」，背景靜默

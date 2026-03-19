@@ -13,7 +13,8 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
       try {
         const parts = token.split('.');
         if (parts.length >= 2) {
-          const payload = JSON.parse(atob(parts[1]));
+          // Token format is payload.signature (2-part JWT)
+          const payload = JSON.parse(atob(parts[0]));
           lineUserId = payload.sub || '';
         }
       } catch (e) {
