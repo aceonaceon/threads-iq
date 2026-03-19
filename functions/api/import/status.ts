@@ -37,12 +37,18 @@ export const onRequestGet: PagesFunction<Env> = async (context): Promise<Respons
       }), { status: 200, headers });
     }
     
-    // Get actual post count from D1
-    const postCountResult = await context.env.THREADSIQ_DB.prepare(
-      'SELECT COUNT(*) as count FROM posts WHERE user_id = ?'
+    // Get actual counts from D1 (live, not stale job record)
+    const countResult = await context.env.THREADSIQ_DB.prepare(
+      `SELECT 
+        COUNT(*) as total_posts,
+        SUM(CASE WHEN embedding IS NOT NULL THEN 1 ELSE 0 END) as with_embedding,
+        MIN(posted_at) as earliest_post,
+        MAX(posted_at) as latest_post
+       FROM posts WHERE user_id = ?`
     ).bind(lineUserId).first<any>();
     
-    const postCount = postCountResult?.count || 0;
+    const totalPosts = countResult?.total_posts || 0;
+    const withEmbedding = countResult?.with_embedding || 0;
     
     return new Response(JSON.stringify({
       status: job.status,
@@ -55,8 +61,10 @@ export const onRequestGet: PagesFunction<Env> = async (context): Promise<Respons
       error: job.error,
       cursor: job.cursor,
       rate_limit_paused_until: job.rate_limit_paused_until,
-      post_count: postCount,
-      total_with_embedding: job.total_with_embedding,
+      post_count: totalPosts,
+      total_with_embedding: withEmbedding,
+      earliest_post: countResult?.earliest_post,
+      latest_post: countResult?.latest_post,
     }), { status: 200, headers });
     
   } catch (error) {
