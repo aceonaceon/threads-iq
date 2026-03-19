@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import PostInput from '../components/PostInput';
+import ImportProgress from '../components/ImportProgress';
 import { runAnalysis, getTopicAnalysisWithClusters, AnalysisResult } from '../lib/api';
 import { runAnalysis as runClientAnalysis, calculateHealthScore } from '../lib/analysis';
 
@@ -30,9 +31,13 @@ export default function Analyze() {
   
   // Threads OAuth state
   const [threadsConnected, setThreadsConnected] = useState(false);
-  const [isImporting, setIsImporting] = useState(false);
-  const [importProgress, setImportProgress] = useState('');
   const [threadsAuthMessage, setThreadsAuthMessage] = useState('');
+  const [importCompleted, setImportCompleted] = useState(false);
+  const [importedPostCount, setImportedPostCount] = useState(0);
+  const [showManualInput, setShowManualInput] = useState(false);
+
+  // Check if user is premium (creator or pro)
+  const isPremium = user?.plan === 'creator' || user?.plan === 'pro';
 
   // Load user data on mount
   useEffect(() => {
@@ -58,14 +63,17 @@ export default function Analyze() {
     }
   }, [isAuthenticated, refreshUser]);
 
-  // Handle Threads OAuth callback messages
+  // Handle Threads OAuth callback - auto trigger import on success
   useEffect(() => {
     const authStatus = searchParams.get('threads_auth');
-    if (authStatus) {
+    if (authStatus && isAuthenticated) {
       if (authStatus === 'success') {
         setThreadsConnected(true);
-        setThreadsAuthMessage('✅ Threads 帳號已連結成功！');
-        setTimeout(() => setThreadsAuthMessage(''), 5000);
+        setThreadsAuthMessage('✅ Threads 帳號已連結成功！正在開始匯入...');
+        // Auto trigger import after OAuth success
+        setTimeout(() => {
+          // The ImportProgress component will handle the actual import start
+        }, 1500);
       } else if (authStatus === 'error') {
         setThreadsAuthMessage('❌ Threads 連結失敗，請稍後再試');
         setTimeout(() => setThreadsAuthMessage(''), 5000);
@@ -73,7 +81,7 @@ export default function Analyze() {
       // Clean up URL
       window.history.replaceState(null, '', '/analyze');
     }
-  }, [searchParams]);
+  }, [searchParams, isAuthenticated]);
 
   // Check Threads connection status
   const checkThreadsStatus = async () => {
@@ -98,65 +106,139 @@ export default function Analyze() {
     window.location.href = `/api/auth/threads/login?token=${encodeURIComponent(lineToken)}`;
   };
 
-  // Auto-import posts from Threads
-  const importFromThreads = async () => {
-    const token = getAuthToken();
-    if (!token) return;
-    
-    setIsImporting(true);
-    setImportProgress('正在取得你的 Threads 貼文...');
-    
+  // Handle import completion from ImportProgress component
+  const handleImportComplete = useCallback((_posts: any[], data: any) => {
+    setImportCompleted(true);
+    setImportedPostCount(data.total_with_embedding || data.total_fetched || 0);
+  }, []);
+
+  // Handle import error
+  const handleImportError = useCallback((error: string) => {
+    setThreadsAuthMessage(`❌ 匯入失敗：${error}`);
+    setTimeout(() => setThreadsAuthMessage(''), 5000);
+  }, []);
+
+  // Analyze from imported posts (read embeddings from D1)
+  const handleAnalyzeFromImport = async () => {
+    if (!isAuthenticated || !user) return;
+
+    setIsAnalyzing(true);
+    setError('');
+
     try {
-      const res = await fetch('/api/threads/import', {
-        method: 'POST',
+      // Step 1: Read posts from D1 via API
+      setStep('正在讀取你的 Threads 貼文...');
+      
+      const token = getAuthToken();
+      const res = await fetch('/api/posts/list', {
         headers: { Authorization: `Bearer ${token}` },
       });
       
-      const data = await res.json();
-      
       if (!res.ok) {
-        if (data.error === 'threads_not_connected') {
-          setThreadsAuthMessage('請先連結 Threads 帳號');
-          connectThreads();
-          return;
-        }
-        throw new Error(data.error || 'import_failed');
+        const data = await res.json();
+        throw new Error(data.error || '讀取貼文失敗');
       }
       
-      if (data.posts && data.posts.length > 0) {
-        setImportProgress(`已取得 ${data.count} 篇貼文，正在處理...`);
-        
-        // Extract text from posts
-        const importedPosts = data.posts
-          .map((p: any) => p.text)
-          .filter((t: string) => t && t.trim().length > 0);
-        
-        if (importedPosts.length >= MIN_POSTS) {
-          setPosts(importedPosts.slice(0, MAX_POSTS));
-          setImportProgress(`✅ 成功匯入 ${importedPosts.length} 篇貼文！`);
-        } else {
-          setImportProgress(`⚠️ 只取得 ${importedPosts.length} 篇文字貼文，至少需要 ${MIN_POSTS} 篇`);
-        }
-      } else {
-        setImportProgress('⚠️ 沒有找到任何貼文，請確認你的 Threads 帳號有公開貼文');
+      const data = await res.json();
+      const importedPosts = data.posts || [];
+      
+      if (importedPosts.length < MIN_POSTS) {
+        throw new Error(`貼文數量不足，需要至少 ${MIN_POSTS} 篇`);
       }
-    } catch (e: any) {
-      console.error('Import failed:', e);
-      setImportProgress('❌ 匯入失敗，請稍後再試');
+      
+      // Extract text from imported posts
+      const postTexts = importedPosts
+        .map((p: any) => p.text)
+        .filter((t: string) => t && t.trim().length > 0)
+        .slice(0, MAX_POSTS);
+      
+      setPosts(postTexts);
+      
+      // Step 2: Get embeddings from server (includes usage check)
+      setStep('正在分析你的貼文語意...');
+      
+      const result = await runAnalysis(postTexts, user.id);
+      
+      // Step 3: Run client-side UMAP + DBSCAN
+      setStep('計算語意距離與集群分組...');
+      const { points2D, labels, clusterCount } = runClientAnalysis(result.embeddings);
+      
+      // Step 4: Get cluster info for topic analysis
+      const clusters: { id: number; posts: string[] }[] = [];
+      if (clusterCount === 0) {
+        // Fallback: treat all posts as one cluster
+        clusters.push({ id: 0, posts: postTexts });
+      } else {
+        for (let i = 0; i < clusterCount; i++) {
+          const clusterPostIndices = labels
+            .map((label, idx) => label === i ? idx : -1)
+            .filter(idx => idx !== -1);
+          const clusterPosts = clusterPostIndices.map(idx => postTexts[idx]);
+          clusters.push({ id: i, posts: clusterPosts });
+        }
+      }
+      
+      // Step 5: Get topic analysis from API
+      setStep('AI 正在生成建議...');
+      const topicAnalysis = await getTopicAnalysisWithClusters(postTexts, clusters);
+      
+      // Step 6: Calculate health score
+      setStep('計算健康分數...');
+      const healthScore = calculateHealthScore(result.embeddings, labels, clusterCount);
+      
+      // Step 7: Build final result
+      const analysisResult: AnalysisResult = {
+        ...result,
+        points2D,
+        labels,
+        topicAnalysis: {
+          ...topicAnalysis,
+          healthScore,
+        },
+      };
+      
+      // Save to cloud
+      if (token) {
+        const saveResponse = await fetch('/api/analyses/save', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            id: result.id,
+            posts: postTexts,
+            result: analysisResult,
+          }),
+        });
+        
+        if (saveResponse.ok) {
+          const saveData = await saveResponse.json();
+          // Update remaining uses from response
+          if (saveData.remaining !== undefined) {
+            setWeeklyRemaining(saveData.remaining);
+          }
+          if (saveData.bonusRemaining !== undefined) {
+            setBonusRemaining(saveData.bonusRemaining);
+          }
+        }
+      }
+      
+      navigate(`/report/${result.id}`);
+    } catch (err: any) {
+      // Handle usage exceeded error
+      if (err.message === 'usage_exceeded' || (err.response?.data?.error === 'usage_exceeded')) {
+        setShowUsageExceededModal(true);
+      } else {
+        setError(err instanceof Error ? err.message : '分析失敗，請稍後再試');
+      }
     } finally {
-      setIsImporting(false);
-      setTimeout(() => setImportProgress(''), 5000);
+      setIsAnalyzing(false);
+      setStep('');
     }
   };
 
   const totalRemaining = weeklyRemaining + bonusRemaining;
-
-  // Redirect if not authenticated
-  useEffect(() => {
-    if (!isAuthenticated && !user) {
-      // Don't auto-login as guest anymore
-    }
-  }, [isAuthenticated, user]);
 
   const validPosts = posts.filter(p => p.trim().length > 0);
 
@@ -352,18 +434,94 @@ export default function Analyze() {
             </p>
           </div>
 
-          {/* Bulk import toggle */}
-          <div className="flex justify-end mb-4">
-            <button
-              onClick={() => setShowBulkImport(!showBulkImport)}
-              className="text-sm text-accent hover:text-accent-hover transition-colors flex items-center gap-1"
-            >
-              {showBulkImport ? '← 逐篇輸入' : '📋 批量匯入'}
-            </button>
-          </div>
+          {/* Threads OAuth / Import Section for Premium Users */}
+          {isAuthenticated && user && isPremium && (
+            <>
+              {/* Import completed - show summary */}
+              {importCompleted ? (
+                <div className="bg-surface rounded-xl p-6 mb-8 border border-gray-800">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="text-2xl">✅</div>
+                    <div>
+                      <p className="text-lg font-semibold text-green-400">
+                        你有 {importedPostCount} 篇貼文可分析
+                      </p>
+                      <p className="text-gray-500 text-sm">
+                        來自你的 Threads 帳號
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex gap-3">
+                    <button
+                      onClick={handleAnalyzeFromImport}
+                      disabled={isAnalyzing}
+                      className="px-6 py-3 bg-accent hover:bg-accent-hover text-white font-medium rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    >
+                      {isAnalyzing ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          分析中...
+                        </>
+                      ) : (
+                        '開始分析'
+                      )}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setImportCompleted(false);
+                        setImportedPostCount(0);
+                      }}
+                      className="px-4 py-3 bg-gray-800 hover:bg-gray-700 text-gray-300 font-medium rounded-xl transition-colors"
+                    >
+                      重新匯入
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {/* Auth message */}
+                  {threadsAuthMessage && (
+                    <div className={`text-sm mb-4 ${threadsAuthMessage.includes('✅') ? 'text-green-400' : 'text-red-400'}`}>
+                      {threadsAuthMessage}
+                    </div>
+                  )}
+                  
+                  {/* Import Progress Component */}
+                  <ImportProgress 
+                    onImportComplete={handleImportComplete}
+                    onError={handleImportError}
+                  />
+                  
+                  {/* Fallback: manual input toggle for premium users */}
+                  {showManualInput && (
+                    <div className="mt-4">
+                      <button
+                        onClick={() => setShowManualInput(false)}
+                        className="text-sm text-gray-500 hover:text-gray-400 transition-colors"
+                      >
+                        ← 回到 Threads 匯入
+                      </button>
+                    </div>
+                  )}
+                  
+                  {!showManualInput && threadsConnected && (
+                    <div className="mb-4">
+                      <button
+                        onClick={() => setShowManualInput(true)}
+                        className="text-sm text-accent hover:text-accent-hover transition-colors"
+                      >
+                        或手動輸入貼文
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+            </>
+          )}
 
-          {/* Threads OAuth Section */}
-          {isAuthenticated && user && (
+          {/* Threads OAuth Section for Free Users (old style) or Premium when manual shown */}
+          {isAuthenticated && user && (!isPremium || showManualInput) && (
             <div className="bg-surface rounded-xl p-6 mb-8 border border-gray-800">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
@@ -380,7 +538,7 @@ export default function Analyze() {
                 
                 {!threadsConnected ? (
                   // Check if user has premium plan
-                  ((user as any)?.plan === 'creator' || (user as any)?.plan === 'pro') ? (
+                  isPremium ? (
                     <button
                       onClick={connectThreads}
                       className="px-4 py-2 bg-[#1877F2] hover:bg-[#1861CB] text-white font-medium rounded-lg transition-colors flex items-center gap-2"
@@ -416,39 +574,25 @@ export default function Analyze() {
                   )
                 ) : (
                   <button
-                    onClick={importFromThreads}
-                    disabled={isImporting}
-                    className="px-4 py-2 bg-accent hover:bg-accent-hover text-white font-medium rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    onClick={() => setShowManualInput(true)}
+                    className="px-4 py-2 bg-accent hover:bg-accent-hover text-white font-medium rounded-lg transition-colors flex items-center gap-2"
                   >
-                    {isImporting ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        匯入中...
-                      </>
-                    ) : (
-                      <>
-                        ⚡ 自動匯入
-                      </>
-                    )}
+                    ⚡ 自動匯入
                   </button>
                 )}
               </div>
-              
-              {/* Import progress/status message */}
-              {importProgress && (
-                <div className={`text-sm ${importProgress.includes('✅') ? 'text-green-400' : importProgress.includes('❌') ? 'text-red-400' : 'text-gray-400'}`}>
-                  {importProgress}
-                </div>
-              )}
-              
-              {/* Threads auth message */}
-              {threadsAuthMessage && (
-                <div className={`text-sm ${threadsAuthMessage.includes('✅') ? 'text-green-400' : 'text-red-400'}`}>
-                  {threadsAuthMessage}
-                </div>
-              )}
             </div>
           )}
+
+          {/* Bulk import toggle */}
+          <div className="flex justify-end mb-4">
+            <button
+              onClick={() => setShowBulkImport(!showBulkImport)}
+              className="text-sm text-accent hover:text-accent-hover transition-colors flex items-center gap-1"
+            >
+              {showBulkImport ? '← 逐篇輸入' : '📋 批量匯入'}
+            </button>
+          </div>
 
           {/* Bulk import panel */}
           {showBulkImport && (
