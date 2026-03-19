@@ -196,13 +196,20 @@ export default function ImportProgress({ onImportComplete, onError }: ImportProg
   }
 
   if (status === 'importing') {
+    const remainingPosts = target - progress;
+    const estimatedMinutes = Math.max(1, Math.ceil(remainingPosts / 50 * 0.5)); // ~50 posts per 30 seconds
     return (
       <div className="bg-surface rounded-xl p-6 mb-8 border border-gray-800">
         <div className="mb-4">
           <p className="text-gray-300 mb-2">正在匯入你的 Threads 貼文...</p>
-          <p className="text-gray-500 text-sm">
-            {progress} / {target} 篇
-          </p>
+          <div className="flex items-center justify-between">
+            <p className="text-gray-500 text-sm">
+              {progress} / {target} 篇
+            </p>
+            <p className="text-gray-600 text-xs">
+              預估剩餘 {estimatedMinutes} 分鐘
+            </p>
+          </div>
         </div>
         
         {/* Progress bar */}
@@ -212,6 +219,9 @@ export default function ImportProgress({ onImportComplete, onError }: ImportProg
             style={{ width: `${progressPercent}%` }}
           />
         </div>
+        <p className="text-gray-600 text-xs mt-2">
+          為避免觸及 API 限制，匯入會分批進行。你可以離開此頁面，稍後回來查看進度。
+        </p>
       </div>
     );
   }

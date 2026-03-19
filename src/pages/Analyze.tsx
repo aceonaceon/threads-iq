@@ -39,7 +39,7 @@ export default function Analyze() {
   // Check if user is premium (creator or pro)
   const isPremium = user?.plan === 'creator' || user?.plan === 'pro';
 
-  // Load user data on mount
+  // Load user data on mount - check threads status AFTER user data is loaded
   useEffect(() => {
     if (isAuthenticated) {
       refreshUser().then(() => {
@@ -56,10 +56,9 @@ export default function Analyze() {
             })
             .catch(console.error);
         }
+        // Check Threads connection status AFTER user data loaded
+        checkThreadsStatus();
       });
-      
-      // Check Threads connection status
-      checkThreadsStatus();
     }
   }, [isAuthenticated, refreshUser]);
 
