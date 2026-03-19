@@ -6,8 +6,8 @@ pages_build_output_dir = "./dist"
 ENV = "production"
 LINE_CHANNEL_ID = "2009518859"
 LINE_CHANNEL_SECRET = "9ce3693d7082b66c4ba59fe4e04bdf72"
-META_APP_ID = ""  
-META_APP_SECRET = ""
+META_APP_ID = "1607480567032033"
+META_APP_SECRET = "cdacaa5ab33a7880d8c7eaf7b7eb8cf9"
 ADMIN_USER_ID = "Ua98ecd52424d5d82c0091d52bb9afce4"
 
 [[kv_namespaces]]
