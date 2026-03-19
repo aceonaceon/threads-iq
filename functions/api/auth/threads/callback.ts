@@ -58,10 +58,32 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
       return Response.redirect('https://threads-iq.pages.dev/analyze?threads_auth=token_failed', 302);
     }
 
+    // Exchange short-lived token for long-lived token (60 days)
+    let longLivedToken = tokenData.access_token;
+    let expiresIn = tokenData.expires_in || 3600;
+    
+    try {
+      const longLivedRes = await fetch(
+        `https://graph.threads.net/access_token?grant_type=th_exchange_token&client_secret=${context.env.META_APP_SECRET}&access_token=${tokenData.access_token}`
+      );
+      const longLivedData: any = await longLivedRes.json();
+      
+      if (longLivedData.access_token) {
+        longLivedToken = longLivedData.access_token;
+        expiresIn = longLivedData.expires_in || (60 * 24 * 60 * 60); // 60 days default
+        console.log('Successfully exchanged for long-lived token');
+      } else {
+        console.error('Long-lived token exchange failed:', JSON.stringify(longLivedData));
+        // Fall back to short-lived token
+      }
+    } catch (e) {
+      console.error('Failed to exchange long-lived token:', e);
+    }
+
     // Get Threads user ID
     let threadsUserId = '';
     try {
-      const userRes = await fetch(`https://graph.threads.net/v1.0/me?access_token=${tokenData.access_token}`);
+      const userRes = await fetch(`https://graph.threads.net/v1.0/me?access_token=${longLivedToken}`);
       const userData: any = await userRes.json();
       threadsUserId = userData.id || '';
     } catch (e) {
@@ -70,11 +92,9 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
 
     // Store token in KV
     const tokenStore = {
-      accessToken: tokenData.access_token,
+      accessToken: longLivedToken,
       threadsUserId,
-      expiresAt: tokenData.expires_in 
-        ? Date.now() + (tokenData.expires_in * 1000)
-        : Date.now() + (60 * 24 * 60 * 60 * 1000), // Default 60 days
+      expiresAt: Date.now() + (expiresIn * 1000),
       createdAt: new Date().toISOString(),
     };
 

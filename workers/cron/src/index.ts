@@ -9,6 +9,7 @@ interface Env {
   THREADSIQ_STORE: KVNamespace;
   APP_URL: string;
   OPENAI_API_KEY: string;
+  META_APP_SECRET: string;
 }
 
 // Process Phase B imports: fetch more posts from Threads API
@@ -306,6 +307,63 @@ async function processInsights(env: Env): Promise<{ updated: number; details: st
   return { updated: totalUpdated, details };
 }
 
+// Refresh Threads tokens that are within 7 days of expiry
+async function refreshTokens(env: Env): Promise<{ refreshed: number; details: string[] }> {
+  const details: string[] = [];
+  const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+  
+  // Get all users with Threads connections
+  const users = await env.THREADSIQ_DB.prepare(
+    `SELECT DISTINCT user_id FROM import_jobs`
+  ).all<any>();
+  
+  let refreshed = 0;
+  
+  for (const row of (users.results || [])) {
+    const tokenStr = await env.THREADSIQ_STORE.get(`threads_token:${row.user_id}`);
+    if (!tokenStr) continue;
+    
+    const tokenData = JSON.parse(tokenStr);
+    if (!tokenData.expiresAt) continue;
+    
+    const timeLeft = tokenData.expiresAt - Date.now();
+    
+    // Already expired
+    if (timeLeft <= 0) {
+      details.push(`User ${row.user_id}: token expired`);
+      continue;
+    }
+    
+    // Not close to expiry yet
+    if (timeLeft > sevenDaysMs) continue;
+    
+    // Refresh the token
+    try {
+      const refreshRes = await fetch(
+        `https://graph.threads.net/refresh_access_token?grant_type=th_refresh_token&access_token=${tokenData.accessToken}`
+      );
+      const refreshData: any = await refreshRes.json();
+      
+      if (refreshData.access_token) {
+        const updatedToken = {
+          ...tokenData,
+          accessToken: refreshData.access_token,
+          expiresAt: Date.now() + ((refreshData.expires_in || 60 * 24 * 60 * 60) * 1000),
+        };
+        await env.THREADSIQ_STORE.put(`threads_token:${row.user_id}`, JSON.stringify(updatedToken));
+        refreshed++;
+        details.push(`User ${row.user_id}: token refreshed`);
+      } else {
+        details.push(`User ${row.user_id}: refresh failed - ${JSON.stringify(refreshData).substring(0, 100)}`);
+      }
+    } catch (e) {
+      details.push(`User ${row.user_id}: refresh error - ${String(e)}`);
+    }
+  }
+  
+  return { refreshed, details };
+}
+
 export default {
   // Cron trigger handler
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
@@ -340,6 +398,15 @@ export default {
       results.insights = { error: String(e) };
     }
     
+    // 4. Refresh expiring tokens
+    try {
+      results.tokenRefresh = await refreshTokens(env);
+      console.log(`[Cron] Token refresh:`, results.tokenRefresh);
+    } catch (e) {
+      console.error('[Cron] Token refresh error:', e);
+      results.tokenRefresh = { error: String(e) };
+    }
+    
     console.log(`[Cron] Complete:`, JSON.stringify(results));
   },
   
@@ -360,6 +427,7 @@ export default {
       try { results.phaseB = await processPhaseB(env); } catch (e) { results.phaseB = { error: String(e) }; }
       try { results.embeddings = await processEmbeddings(env); } catch (e) { results.embeddings = { error: String(e) }; }
       try { results.insights = await processInsights(env); } catch (e) { results.insights = { error: String(e) }; }
+      try { results.tokenRefresh = await refreshTokens(env); } catch (e) { results.tokenRefresh = { error: String(e) }; }
       
       return new Response(JSON.stringify(results, null, 2), {
         headers: { 'Content-Type': 'application/json' },
