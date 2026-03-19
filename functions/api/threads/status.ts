@@ -1,5 +1,15 @@
 interface Env {
   THREADSIQ_STORE: KVNamespace;
+  LINE_CHANNEL_SECRET: string;
+}
+
+function base64Decode(str: string): string {
+  const binary = atob(str);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return new TextDecoder().decode(bytes);
 }
 
 export const onRequestGet: PagesFunction<Env> = async (context) => {
@@ -13,8 +23,8 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
       try {
         const parts = token.split('.');
         if (parts.length >= 2) {
-          // Token format is payload.signature (2-part JWT)
-          const payload = JSON.parse(atob(parts[0]));
+          // Token format is payload.signature (2-part JWT), unicode-safe decode
+          const payload = JSON.parse(base64Decode(parts[0]));
           lineUserId = payload.sub || '';
         }
       } catch (e) {
