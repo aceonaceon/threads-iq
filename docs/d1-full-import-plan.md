@@ -342,6 +342,65 @@ CREATE INDEX idx_neighbors_user ON semantic_neighbors(user_id, checked_at DESC);
 
 ---
 
+## 延伸功能：管理後台匯入監控（規劃中，暫不實作）
+
+### 需求
+Jason 需要在 Admin Dashboard 看到每個用戶的資料匯入狀況，包含：
+- Phase A（前台 300 篇）進度
+- Phase B（背景全量）進度
+- 總匯入篇數 / 預估總篇數
+
+### Meta API 限制
+- Threads API **沒有**直接取得用戶總貼文數的端點
+- 只能持續翻頁直到沒有更多資料（`paging.next` 為空）
+- 所以「預估總篇數」在 Phase B 完成前是未知的
+
+### Admin Dashboard 設計
+
+#### 匯入狀態列表（新增到 /admin 頁面）
+```
+| 用戶 | Phase | 狀態 | 已匯入 | 有 Embedding | 最早貼文 | 最新貼文 | 上次更新 |
+|------|-------|------|--------|-------------|---------|---------|---------|
+| 留學顧問Jason | B | 進行中 | 1,247 | 300 | 2024-01-15 | 2026-03-19 | 2 分鐘前 |
+| 夏ʕ •ᴥ•ʔ | A | 完成 | 156 | 156 | 2025-08-03 | 2026-03-18 | 1 小時前 |
+| 某用戶 | B | 暫停(限速) | 892 | 300 | 2024-06-01 | 2026-03-17 | 15 分鐘前 |
+```
+
+#### 需要的 API
+| Endpoint | 功能 |
+|----------|------|
+| `GET /api/admin/imports` | 列出所有用戶的匯入狀態（join import_jobs + posts count） |
+
+#### SQL 查詢
+```sql
+SELECT 
+  ij.user_id,
+  ij.status,
+  ij.phase,
+  ij.total_fetched,
+  ij.phase_a_completed_at,
+  ij.completed_at,
+  ij.rate_limit_paused_until,
+  ij.started_at,
+  (SELECT COUNT(*) FROM posts p WHERE p.user_id = ij.user_id) as total_posts,
+  (SELECT COUNT(*) FROM posts p WHERE p.user_id = ij.user_id AND p.embedding IS NOT NULL) as posts_with_embedding,
+  (SELECT MIN(posted_at) FROM posts p WHERE p.user_id = ij.user_id) as oldest_post,
+  (SELECT MAX(posted_at) FROM posts p WHERE p.user_id = ij.user_id) as newest_post
+FROM import_jobs ij
+WHERE ij.id IN (
+  SELECT MAX(id) FROM import_jobs GROUP BY user_id
+)
+ORDER BY ij.started_at DESC;
+```
+
+#### 進度顯示邏輯
+- Phase A：顯示 `已匯入 / 300` + 進度條
+- Phase B：顯示 `已匯入 X 篇（持續中...）`（無法顯示百分比，因為不知道總數）
+- Phase B 完成：顯示 `全部匯入完成：X 篇`
+- 暫停中：顯示 `暫停（限速），預計 HH:MM 恢復`
+
+---
+
 ## 十、注意事項
 
 - **使用者不知道全量匯入**：前端只顯示「300 篇 / 6 個月」，背景靜默
