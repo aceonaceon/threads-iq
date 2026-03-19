@@ -143,6 +143,15 @@ DELETE FROM import_jobs WHERE user_id = ?;
 
 ---
 
+## 三-B、Workers Paid 升級後的改進
+
+升級到 Workers Paid ($5/月) 後可以做的改進：
+- Subrequest 1,000：匯入時可以同時抓 insights（不用跳過）
+- Cron Trigger：每 5 分鐘驅動 Phase B + embedding 計算
+- 未來：排程發文、自動更新、insights 刷新
+
+---
+
 ## 四、測試計畫
 
 ### Pre-test: 清除 Jason 的資料
