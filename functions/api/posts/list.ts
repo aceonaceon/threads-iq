@@ -204,16 +204,18 @@ export const onRequestGet: PagesFunction<Env> = async (context): Promise<Respons
       });
     }
     
+    // Return plan-limited total (don't leak Phase B count to non-pro users)
+    const visibleTotal = Math.min(totalCount, maxPosts);
+    
     return new Response(JSON.stringify({
       posts: formattedPosts,
-      total: totalCount,
+      total: visibleTotal,
       page,
       pageSize: effectivePageSize,
-      totalPages,
+      totalPages: Math.ceil(visibleTotal / effectivePageSize),
       plan,
       sortBy: sortColumn,
       sortOrder: sortDirection.toLowerCase(),
-      limit_applied: plan === 'free' ? 30 : plan === 'creator' ? 300 : 'unlimited',
     }), { status: 200, headers });
     
   } catch (error) {
