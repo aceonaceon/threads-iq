@@ -1,5 +1,8 @@
 {
-  "completed": ["a1","a2","b1","b3","c1","c5","d1","a3","a4","a5","b2","b4","b5","b6","c2","c3","a6","c4","d2","d3","d4","e1","e2","e3","e4","e5","e6-semantic-decay"],
-  "current": "e7-golden-window",
-  "pending": []
+  "status": "ALL_COMPLETE",
+  "completed": ["a1","a2","b1","b3","c1","c5","d1","a3","a4","a5","b2","b4","b5","b6","c2","c3","a6","c4","d2","d3","d4","e1","e2","e3","e4","e5","e6","e7-golden-window"],
+  "current": null,
+  "pending": [],
+  "total": 28,
+  "completedAt": "2026-03-19T12:42+08:00"
 }

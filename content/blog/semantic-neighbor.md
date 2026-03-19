@@ -41,7 +41,7 @@ keywords: ["語意鄰居", "Semantic Neighbor", "Threads 互動策略", "Social 
 
 **方法二**：去你確定是同 niche 的帳號留言區，找「有觀點評論者」裡的陌生帳號。點進他們的帳號看看，如果談的也是類似話題，很可能就是你應該互動的對象。
 
-**方法三**：用語意分析工具直接比較兩個帳號的 Embedding 距離。 ThreadsIQ 就提供了這樣的功能，讓你不用自己猜測。
+**方法三**：用語意分析工具直接比較兩個帳號的 Embedding 距離。 [ThreadsIQ](https://threads-iq.pages.dev) 就提供了這樣的功能，讓你不用自己猜測。
 
 ## 找到語意鄰居後怎麼互動？
 
@@ -51,4 +51,4 @@ keywords: ["語意鄰居", "Semantic Neighbor", "Threads 互動策略", "Social 
 
 長期策略是讓語意鄰居習慣看到你的名字。每一次有價值的互動，都在加深 Social Graph 的連結強度。當系統判斷你們是「同一群體」時，內容就會自然地在彼此的粉絲之間流傳。
 
-如果你想系統化地找出值得互動的帳號， ThreadsIQ 的語意鄰居分析功能可以幫你快速定位 vector space 中與你最接近的帳號，讓你把時間花在對的人身上。
+如果你想系統化地找出值得互動的帳號， [ThreadsIQ 的語意鄰居分析](https://threads-iq.pages.dev)可以幫你快速定位 vector space 中與你最接近的帳號，讓你把時間花在對的人身上。
