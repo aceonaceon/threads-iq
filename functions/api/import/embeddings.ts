@@ -76,26 +76,26 @@ export const onRequestPost: PagesFunction<Env> = async (context): Promise<Respon
     const embeddingData: any = await embeddingResponse.json();
     const embeddings = embeddingData.data || [];
     
-    // Update posts with embeddings
-    let updated = 0;
+    // Batch update posts with embeddings (was one-by-one = 100 subrequests, now 1)
+    const updateStmts: any[] = [];
     let embIdx = 0;
     
     for (const post of postsToEmbed) {
       if (!post.text || post.text.length === 0) continue;
       if (embIdx >= embeddings.length) break;
       
-      const embedding = embeddings[embIdx].embedding;
-      await context.env.THREADSIQ_DB.prepare(
-        'UPDATE posts SET embedding = ? WHERE id = ?'
-      ).bind(JSON.stringify(embedding), post.id).run();
-      
-      updated++;
+      updateStmts.push(
+        context.env.THREADSIQ_DB.prepare('UPDATE posts SET embedding = ? WHERE id = ?')
+          .bind(JSON.stringify(embeddings[embIdx].embedding), post.id)
+      );
       embIdx++;
-      
-      // Check timeout (save progress before 25s)
-      if (Date.now() - startTime > 20000) {
-        break;
-      }
+    }
+    
+    // D1 batch limit ~100 statements, split if needed
+    let updated = 0;
+    for (let i = 0; i < updateStmts.length; i += 100) {
+      await context.env.THREADSIQ_DB.batch(updateStmts.slice(i, i + 100));
+      updated += Math.min(100, updateStmts.length - i);
     }
     
     // Check remaining
