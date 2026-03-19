@@ -487,11 +487,13 @@ export default function Analyze() {
                     </div>
                   )}
                   
-                  {/* Import Progress Component */}
-                  <ImportProgress 
-                    onImportComplete={handleImportComplete}
-                    onError={handleImportError}
-                  />
+                  {/* Import Progress Component - only show when connected */}
+                  {threadsConnected && (
+                    <ImportProgress 
+                      onImportComplete={handleImportComplete}
+                      onError={handleImportError}
+                    />
+                  )}
                   
                   {/* Fallback: manual input toggle for premium users */}
                   {showManualInput && (
