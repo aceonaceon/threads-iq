@@ -149,17 +149,48 @@ export const onRequestPost: PagesFunction<Env> = async (context): Promise<Respon
         postsFetched++;
       }
       
-      // Batch insert new posts
+      // Batch insert new posts + fetch insights
       if (batch.length > 0) {
-        const stmts = batch.map(post => 
+        const postStmts = batch.map(post => 
           context.env.THREADSIQ_DB.prepare(
             `INSERT INTO posts (user_id, threads_post_id, text, posted_at, media_type, permalink)
              VALUES (?, ?, ?, ?, ?, ?)
              ON CONFLICT(threads_post_id) DO NOTHING`
           ).bind(lineUserId, post.id, post.text || '', post.timestamp, post.media_type || null, post.permalink || '')
         );
-        await context.env.THREADSIQ_DB.batch(stmts);
-        console.log(`Inserted ${batch.length} new posts`);
+        
+        const insightStmts: any[] = [];
+        for (const post of batch) {
+          try {
+            const insightsRes = await fetch(
+              `https://graph.threads.net/v1.0/${post.id}/insights?metric=views,likes,replies,reposts,quotes&access_token=${accessToken}`
+            );
+            const insightsData: any = await insightsRes.json();
+            
+            let views = 0, likes = 0, replies = 0, reposts = 0, quotes = 0;
+            if (insightsData.data) {
+              for (const m of insightsData.data) {
+                const name = m.name || '';
+                const val = m.values?.[0]?.value ?? m.value ?? 0;
+                if (name === 'views') views = val;
+                if (name === 'likes') likes = val;
+                if (name === 'replies') replies = val;
+                if (name === 'reposts') reposts = val;
+                if (name === 'quotes') quotes = val;
+              }
+            }
+            
+            insightStmts.push(
+              context.env.THREADSIQ_DB.prepare(
+                `INSERT INTO post_insights (threads_post_id, user_id, views, likes, replies, reposts, quotes, fetched_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))`
+              ).bind(post.id, lineUserId, views, likes, replies, reposts, quotes)
+            );
+          } catch {}
+        }
+        
+        await context.env.THREADSIQ_DB.batch([...postStmts, ...insightStmts]);
+        console.log(`Inserted ${batch.length} new posts + ${insightStmts.length} insights`);
       }
       
       // Pagination
@@ -176,39 +207,6 @@ export const onRequestPost: PagesFunction<Env> = async (context): Promise<Respon
     ).bind(lineUserId).first<any>();
     
     const totalPosts = countResult?.count || 0;
-    
-    // Now fetch insights for new posts
-    let newInsights = 0;
-    if (postsFetched > 0) {
-      // Get posts without insights (recently imported)
-      const postsWithoutInsights = await context.env.THREADSIQ_DB.prepare(
-        `SELECT p.threads_post_id 
-         FROM posts p
-         LEFT JOIN post_insights pi ON p.threads_post_id = pi.threads_post_id
-         WHERE p.user_id = ? AND pi.threads_post_id IS NULL
-         ORDER BY p.posted_at DESC
-         LIMIT 50`
-      ).bind(lineUserId).all<any>();
-      
-      const postsToFetchInsights = postsWithoutInsights.results || [];
-      
-      // Batch fetch insights
-      for (const postInfo of postsToFetchInsights) {
-        try {
-          const insightsUrl = new URL(`https://graph.threads.net/v1.0/${postInfo.threads_post_id}`);
-          insightsUrl.searchParams.set('fields', 'id,permalink,created_at,text,media_type,media_url');
-          insightsUrl.searchParams.set('access_token', accessToken);
-          // Note: Threads API may not have direct insights endpoint, we'll try
-          
-          // For now, just mark as fetched with placeholder - real insights need separate API
-          // Actually let's skip insights for refresh - they're optional
-        } catch (e) {
-          // Skip insights errors
-        }
-        
-        if (isApproachingTimeout(startTime)) break;
-      }
-    }
     
     // Update job as completed
     await context.env.THREADSIQ_DB.prepare(

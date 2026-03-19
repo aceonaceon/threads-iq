@@ -123,16 +123,51 @@ export const onRequestPost: PagesFunction<Env> = async (context): Promise<Respon
         postsFetched++;
       }
       
-      // Batch insert using D1 batch API (1 subrequest for all inserts)
+      // Batch insert posts + fetch insights (paid plan: 1000 subrequests)
       if (batch.length > 0) {
-        const stmts = batch.map(post => 
+        const postStmts = batch.map(post => 
           context.env.THREADSIQ_DB.prepare(
             `INSERT INTO posts (user_id, threads_post_id, text, posted_at, media_type, permalink)
              VALUES (?, ?, ?, ?, ?, ?)
              ON CONFLICT(threads_post_id) DO NOTHING`
           ).bind(lineUserId, post.id, post.text || '', post.timestamp, post.media_type || null, post.permalink || '')
         );
-        await context.env.THREADSIQ_DB.batch(stmts);
+        
+        // Fetch insights for each post in this batch
+        const insightStmts: any[] = [];
+        for (const post of batch) {
+          try {
+            const insightsUrl = `https://graph.threads.net/v1.0/${post.id}/insights?metric=views,likes,replies,reposts,quotes&access_token=${accessToken}`;
+            const insightsRes = await fetch(insightsUrl);
+            const insightsData: any = await insightsRes.json();
+            
+            let views = 0, likes = 0, replies = 0, reposts = 0, quotes = 0;
+            if (insightsData.data) {
+              for (const m of insightsData.data) {
+                const name = m.name || '';
+                const val = m.values?.[0]?.value ?? m.value ?? 0;
+                if (name === 'views') views = val;
+                if (name === 'likes') likes = val;
+                if (name === 'replies') replies = val;
+                if (name === 'reposts') reposts = val;
+                if (name === 'quotes') quotes = val;
+              }
+            }
+            
+            insightStmts.push(
+              context.env.THREADSIQ_DB.prepare(
+                `INSERT INTO post_insights (threads_post_id, user_id, views, likes, replies, reposts, quotes, fetched_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))`
+              ).bind(post.id, lineUserId, views, likes, replies, reposts, quotes)
+            );
+          } catch {
+            // Skip individual insight errors
+          }
+        }
+        
+        // Batch write posts + insights together
+        const allStmts = [...postStmts, ...insightStmts];
+        await context.env.THREADSIQ_DB.batch(allStmts);
       }
       
       // Pagination
