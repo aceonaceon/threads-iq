@@ -67,4 +67,4 @@ Meta 官方說得很清楚：「The content on your Threads feed is selected, ra
 
 語意分析聽起來很技術，但它對創作者的影響其實非常實際——它決定了你的內容會被誰看到。
 
-如果你想實際看看自己的帳號被 AI「語意分析」後的結果，把最近的貼文貼進 [ThreadsIQ 的語意分析](https://threads-iq.com)，它用和 Threads 相同類型的 Embedding 技術分析你的帳號，把語意分布可視化給你看。
+如果你想實際看看自己的帳號被 AI「語意分析」後的結果，把最近的貼文貼進 [ThreadsIQ 的語意分析](https://threads-iq.pages.dev)，它用和 Threads 相同類型的 Embedding 技術分析你的帳號，把語意分布可視化給你看。
