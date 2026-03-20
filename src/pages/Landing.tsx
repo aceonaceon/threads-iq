@@ -491,20 +491,20 @@ export default function Landing() {
                 <li className="flex items-start gap-2"><span className="text-green-400 mt-0.5">✅</span><span className="text-gray-300">偏離貼文偵測</span></li>
                 <li className="flex items-start gap-2"><span className="text-green-400 mt-0.5">✅</span><span className="text-gray-300">AI 下一篇方向建議</span></li>
                 <li className="flex items-start gap-2"><span className="text-green-400 mt-0.5">✅</span><span className="text-gray-300">歷史記錄（無限）</span></li>
-                <li className="flex items-start gap-2"><span className="text-yellow-500 mt-0.5">🔧</span><span className="text-gray-300">發文前語意評分 <span className="text-gray-500 text-xs">開發中</span></span></li>
-                <li className="flex items-start gap-2"><span className="text-yellow-500 mt-0.5">🔧</span><span className="text-gray-300">內容蠶食偵測 <span className="text-gray-500 text-xs">開發中</span></span></li>
-                <li className="flex items-start gap-2"><span className="text-yellow-500 mt-0.5">🔧</span><span className="text-gray-300">Hook 格式評分 <span className="text-gray-500 text-xs">開發中</span></span></li>
-                <li className="flex items-start gap-2"><span className="text-yellow-500 mt-0.5">🔧</span><span className="text-gray-300">串文複利引擎 <span className="text-gray-500 text-xs">開發中</span></span></li>
+                <li className="flex items-start gap-2"><span className="text-green-400 mt-0.5">✅</span><span className="text-gray-300">發文前語意評分（DraftCheck）</span></li>
+                <li className="flex items-start gap-2"><span className="text-green-400 mt-0.5">✅</span><span className="text-gray-300">內容蠶食偵測</span></li>
+                <li className="flex items-start gap-2"><span className="text-green-400 mt-0.5">✅</span><span className="text-gray-300">Hook 格式評分</span></li>
+                <li className="flex items-start gap-2"><span className="text-green-400 mt-0.5">✅</span><span className="text-gray-300">串文複利引擎</span></li>
                 <li className="flex items-start gap-2"><span className="text-gray-600 mt-0.5">—</span><span className="text-gray-500">排程發文</span></li>
                 <li className="flex items-start gap-2"><span className="text-gray-600 mt-0.5">—</span><span className="text-gray-500">主題輪替管家</span></li>
               </ul>
               {user ? (
-                <Link to="/analyze" className="block w-full text-center py-3 rounded-xl bg-cta hover:bg-cta-hover text-white transition-colors text-sm font-semibold">
-                  立即升級
-                </Link>
+                <button disabled className="block w-full text-center py-3 rounded-xl bg-gray-600 text-gray-400 cursor-not-allowed text-sm font-semibold">
+                  內部封測中
+                </button>
               ) : (
-                <button onClick={handleAnalyze} className="block w-full text-center py-3 rounded-xl bg-cta hover:bg-cta-hover text-white transition-colors text-sm font-semibold">
-                  立即升級
+                <button disabled className="block w-full text-center py-3 rounded-xl bg-gray-600 text-gray-400 cursor-not-allowed text-sm font-semibold">
+                  內部封測中
                 </button>
               )}
             </div>
@@ -530,12 +530,12 @@ export default function Landing() {
                 <li className="flex items-start gap-2"><span className="text-yellow-500 mt-0.5">🔧</span><span className="text-gray-300">AI 回覆建議 <span className="text-gray-500 text-xs">開發中</span></span></li>
               </ul>
               {user ? (
-                <Link to="/analyze" className="block w-full text-center py-3 rounded-xl bg-cta hover:bg-cta-hover text-white transition-colors text-sm font-semibold">
-                  立即升級
-                </Link>
+                <button disabled className="block w-full text-center py-3 rounded-xl bg-gray-600 text-gray-400 cursor-not-allowed text-sm font-semibold">
+                  持續開發中
+                </button>
               ) : (
-                <button onClick={handleAnalyze} className="block w-full text-center py-3 rounded-xl bg-cta hover:bg-cta-hover text-white transition-colors text-sm font-semibold">
-                  立即升級
+                <button disabled className="block w-full text-center py-3 rounded-xl bg-gray-600 text-gray-400 cursor-not-allowed text-sm font-semibold">
+                  持續開發中
                 </button>
               )}
             </div>

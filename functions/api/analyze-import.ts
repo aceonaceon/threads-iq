@@ -132,19 +132,25 @@ function computeDbscanParams(embeddings: number[][]): { epsilon: number, minPts:
 }
 
 // Health score calculation
-function calculateHealthScore(embeddings: number[][], labels: number[], clusterCount: number): number {
+function calculateHealthScore(
+  embeddings: number[][],
+  labels: number[],
+  clusterCount: number,
+  engagementRate: number = 0
+): number {
   if (embeddings.length === 0) return 0;
   
   const n = embeddings.length;
   const effectiveClusters = clusterCount === 0 ? 1 : clusterCount;
   
   // Concentration: how evenly distributed are posts across clusters
+  // Higher concentration in one cluster = higher score (more focused content)
   const clusterSizes: number[] = new Array(effectiveClusters).fill(0);
   for (const label of labels) {
     if (label >= 0 && label < effectiveClusters) clusterSizes[label]++;
   }
   const maxSize = Math.max(...clusterSizes);
-  const concentration = 1 - (maxSize / n);
+  const concentration = maxSize / n; // 0.95 = 95% concentrated = 95 points
   
   // Coverage: what % of posts are in clusters (not noise)
   const inCluster = labels.filter(l => l >= 0).length;
@@ -177,7 +183,16 @@ function calculateHealthScore(embeddings: number[][], labels: number[], clusterC
   }
   const focus = interCount > 0 ? 1 - (interSim / interCount) : 0.5;
   
-  return Math.round((concentration * 30 + coverage * 30 + coherence * 25 + focus * 15) * 100) / 100;
+  // Text analysis score (original formula)
+  const textAnalysisScore = concentration * 0.30 + coverage * 0.30 + coherence * 0.25 + focus * 0.15;
+  
+  // Normalize engagement rate: 10% = 100 points, cap at 100
+  const normalizedEngagement = Math.min(engagementRate * 10, 100);
+  
+  // Final score: 70% text analysis + 30% engagement
+  const finalScore = textAnalysisScore * 0.7 + normalizedEngagement * 0.3;
+  
+  return Math.round(finalScore * 100) / 100;
 }
 
 export const onRequestPost: PagesFunction<Env> = async (context): Promise<Response> => {
@@ -355,6 +370,21 @@ export const onRequestPost: PagesFunction<Env> = async (context): Promise<Respon
       ? validTexts.filter((_, i) => i % Math.ceil(validTexts.length / maxForGpt) === 0)
       : validTexts;
     
+    // Calculate average engagement rate and health score BEFORE calling GPT
+    let totalEngagementRate = 0;
+    let countWithViews = 0;
+    for (const e of postEngagements) {
+      if (e.views > 0) {
+        totalEngagementRate += ((e.likes + e.replies + e.reposts + e.quotes) / e.views) * 100;
+        countWithViews++;
+      }
+    }
+    const avgEngagementRate = countWithViews > 0 ? totalEngagementRate / countWithViews : 0;
+    const healthScore = calculateHealthScore(embeddings, labels, clusterCount, avgEngagementRate);
+    
+    // Health score level for GPT prompt
+    const healthLevel = healthScore < 50 ? "需要改善" : healthScore <= 70 ? "中等，有進步空間" : "良好";
+    
     // Call GPT for topic analysis with engagement data
     const gptSystemPrompt = `你是一位社群媒體內容分析師，專門分析 Threads 平台上的內容。請基於以下數據給出只適用於 Threads 的建議。注意：Threads 不支援線上問答/直播/投票等功能，請不要建議這些。
 
@@ -367,6 +397,10 @@ export const onRequestPost: PagesFunction<Env> = async (context): Promise<Respon
 - 總引用數: ${accountStats.totalQuotes}
 - 總加權互動: ${accountStats.totalWeightedEngagement}
 - 互動率: ${accountStats.engagementRate}%
+
+## 內容健康度評分
+- 健康分數: ${healthScore}分（${healthLevel}）
+- 評估維度：內容集中度、叢集覆蓋率、叢集內聚力、叢集區分度
 
 ## 叢集數據（加權互動 = 回覆×4 + 轉發×5 + 引用×4 + 按讚×2）
 ${clusterStats.map(c => `- ${c.name}: ${c.postCount}篇, 平均互動率${c.avgEngagementRate}%, 最高互動${c.topEngagement}`).join('\n')}
@@ -418,9 +452,6 @@ ${formatStats.map(f => `- ${f.type}: ${f.postCount}篇, 平均互動率${f.avgEn
     
     const gptData: any = await gptResponse.json();
     const topicAnalysis = JSON.parse(gptData.choices[0].message.content);
-    
-    // Calculate health score
-    const healthScore = calculateHealthScore(embeddings, labels, clusterCount);
     
     // Generate 2D layout from cluster labels (simple radial layout per cluster)
     const points2D: number[][] = labels.map((label: number, i: number) => {

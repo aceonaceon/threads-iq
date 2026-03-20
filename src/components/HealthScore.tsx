@@ -3,9 +3,10 @@ import { useEffect, useState } from 'react';
 interface HealthScoreProps {
   score: number;
   assessment: string;
+  hasEngagementData?: boolean;
 }
 
-export default function HealthScore({ score, assessment }: HealthScoreProps) {
+export default function HealthScore({ score, assessment, hasEngagementData = true }: HealthScoreProps) {
   const [animatedScore, setAnimatedScore] = useState(0);
 
   useEffect(() => {
@@ -120,6 +121,17 @@ export default function HealthScore({ score, assessment }: HealthScoreProps) {
           💡 提升方向：增加主題聚焦、善用圖片/影片格式、提高互動率
         </div>
       </div>
+
+      {/* Engagement Data Hint for Free Users */}
+      {!hasEngagementData && (
+        <div className="mt-4 text-sm text-gray-500 bg-white/5 rounded-lg px-4 py-3">
+          <span className="text-yellow-500 mr-1">ℹ️</span>
+          此分數基於文字分析，連接 Threads 帳號可獲得含真實互動數據的準確評估。{' '}
+          <a href="/analyze" className="text-accent hover:underline">立即連結</a>
+          {' '}或{' '}
+          <a href="/#pricing" className="text-accent hover:underline">升級 Pro</a>
+        </div>
+      )}
     </div>
   );
 }

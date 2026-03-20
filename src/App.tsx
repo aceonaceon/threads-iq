@@ -1,4 +1,4 @@
-import { Routes, Route, useNavigate } from 'react-router-dom';
+import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { useEffect } from 'react';
 import Layout from './components/Layout';
 import Landing from './pages/Landing';
@@ -14,6 +14,23 @@ import BlogPost from './pages/BlogPost';
 import Admin from './pages/Admin';
 import Posts from './pages/Posts';
 import { AuthProvider, useAuth } from './lib/auth';
+
+// Scroll to hash on route change
+function ScrollToHash() {
+  const { hash, pathname } = useLocation();
+  
+  useEffect(() => {
+    if (hash) {
+      const id = hash.replace('#', '');
+      const element = document.getElementById(id);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+  }, [hash, pathname]);
+  
+  return null;
+}
 
 // Auth success handler component
 function AuthSuccessHandler() {
@@ -146,6 +163,7 @@ function AppRoutes() {
 export default function App() {
   return (
     <AuthProvider>
+      <ScrollToHash />
       <Layout>
         <AppRoutes />
       </Layout>

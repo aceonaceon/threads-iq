@@ -20,11 +20,53 @@ const CLUSTER_COLORS = [
   '#EF4444',
 ];
 
+// CTA Component for free users
+function EngagementCTACard() {
+  return (
+    <div className="bg-surface rounded-2xl p-6 animate-fade-in" style={{ animationDelay: '0.15s' }}>
+      <div className="text-center py-8">
+        <div className="text-4xl mb-4">📊</div>
+        <h2 className="text-xl font-bold mb-2">互動數據</h2>
+        <p className="text-gray-400 mb-6 max-w-md mx-auto">
+          連結 Threads 帳號，解鎖完整互動分析
+        </p>
+        <ul className="text-left text-gray-500 text-sm max-w-xs mx-auto mb-6 space-y-2">
+          <li className="flex items-center gap-2">
+            <span className="text-accent">✓</span> 觀看次數、互動率
+          </li>
+          <li className="flex items-center gap-2">
+            <span className="text-accent">✓</span> 按格式/叢集分析
+          </li>
+          <li className="flex items-center gap-2">
+            <span className="text-accent">✓</span> AI 生成的精準優化建議
+          </li>
+        </ul>
+        <div className="flex gap-3 justify-center">
+          <a
+            href="/analyze"
+            className="px-6 py-3 bg-accent hover:bg-accent-hover text-white font-medium rounded-xl transition-colors"
+          >
+            立即連結帳號
+          </a>
+          <a
+            href="/#pricing"
+            className="px-6 py-3 bg-white/10 hover:bg-white/20 text-white font-medium rounded-xl transition-colors"
+          >
+            升級 Pro
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AnalysisReport({ result, posts }: AnalysisReportProps) {
   const [expandedClusters, setExpandedClusters] = useState<Set<number>>(new Set());
 
   const { points2D, labels, topicAnalysis, engagementStats } = result;
   const { clusters, healthScore, healthAssessment, nextPostSuggestions, recommendations } = topicAnalysis;
+  
+  const hasEngagementData = !!engagementStats;
 
   const toggleCluster = (idx: number) => {
     const newExpanded = new Set(expandedClusters);
@@ -56,15 +98,19 @@ export default function AnalysisReport({ result, posts }: AnalysisReportProps) {
     <div className="max-w-4xl mx-auto px-4 py-8 space-y-8">
       {/* Health Score Hero */}
       <div className="bg-surface rounded-2xl p-8 text-center">
-        <HealthScore score={healthScore} assessment={healthAssessment || getAssessmentText(healthScore)} />
+        <HealthScore 
+          score={healthScore} 
+          assessment={healthAssessment || getAssessmentText(healthScore)} 
+          hasEngagementData={hasEngagementData}
+        />
         <p className="text-gray-500 mt-4 max-w-md mx-auto">
           這個分數反映了你的內容聚焦程度。高分表示你的主題明確且一致，
           低分表示內容過於分散。
         </p>
       </div>
 
-      {/* Engagement Stats */}
-      {engagementStats && (
+      {/* Engagement Stats - Show CTA for free users, actual data for connected users */}
+      {hasEngagementData ? (
         <div className="bg-surface rounded-2xl p-6 animate-fade-in" style={{ animationDelay: '0.15s' }}>
           <h2 className="text-xl font-bold mb-4">📊 貼文表現數據</h2>
           
@@ -118,6 +164,8 @@ export default function AnalysisReport({ result, posts }: AnalysisReportProps) {
             </div>
           )}
         </div>
+      ) : (
+        <EngagementCTACard />
       )}
 
       {/* Semantic Cluster Map */}
