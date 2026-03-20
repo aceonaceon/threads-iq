@@ -356,10 +356,9 @@ export const onRequestPost: PagesFunction<Env> = async (context): Promise<Respon
       : validTexts;
     
     // Call GPT for topic analysis with engagement data
-    const gptSystemPrompt = `你是一位社群媒體內容分析師。分析以下 Threads 貼文的語意叢集，為每個叢集命名並給出建議。
-以下是你帳號的真實數據，請基於這些數據給建議。千萬不要提及任何產業平均值或benchmark，因為我們沒有這些數據。
+    const gptSystemPrompt = `你是一位社群媒體內容分析師，專門分析 Threads 平台上的內容。請基於以下數據給出只適用於 Threads 的建議。注意：Threads 不支援線上問答/直播/投票等功能，請不要建議這些。
 
-## 帳號整體數據
+## 你帳號的真實數據（來自 Threads Insights API）
 - 總貼文數: ${accountStats.totalPosts}
 - 總瀏覽量: ${accountStats.totalViews}
 - 總按讚數: ${accountStats.totalLikes}
