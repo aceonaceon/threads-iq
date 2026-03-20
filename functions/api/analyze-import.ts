@@ -221,9 +221,14 @@ export const onRequestPost: PagesFunction<Env> = async (context): Promise<Respon
     // Read posts with embeddings from D1 (filtered by current Threads account)
     const limit = plan === 'free' ? 30 : plan === 'creator' ? 300 : 10000;
     const posts = await context.env.THREADSIQ_DB.prepare(
-      `SELECT id, text, embedding, posted_at FROM posts 
-       WHERE user_id = ? AND threads_user_id = ? AND embedding IS NOT NULL AND text IS NOT NULL AND text != ''
-       ORDER BY posted_at DESC LIMIT ?`
+      `SELECT p.id, p.text, p.embedding, p.posted_at, p.media_type, p.threads_post_id,
+              COALESCE(i.views, 0) as views, COALESCE(i.likes, 0) as likes,
+              COALESCE(i.replies, 0) as replies, COALESCE(i.reposts, 0) as reposts,
+              COALESCE(i.quotes, 0) as quotes
+       FROM posts p
+       LEFT JOIN post_insights i ON p.threads_post_id = i.threads_post_id AND p.user_id = i.user_id
+       WHERE p.user_id = ? AND p.threads_user_id = ? AND p.embedding IS NOT NULL AND p.text IS NOT NULL AND p.text != ''
+       ORDER BY p.posted_at DESC LIMIT ?`
     ).bind(lineUserId, threadsUserId, limit).all<any>();
     
     const postsList = posts.results || [];
@@ -232,9 +237,10 @@ export const onRequestPost: PagesFunction<Env> = async (context): Promise<Respon
       return new Response(JSON.stringify({ error: '貼文數量不足，需要至少 5 篇有效貼文' }), { status: 400, headers });
     }
     
-    // Parse embeddings
+    // Parse embeddings and collect engagement data
     const embeddings: number[][] = [];
     const validTexts: string[] = [];
+    const postEngagements: { views: number; likes: number; replies: number; reposts: number; quotes: number; mediaType: string }[] = [];
     
     for (const post of postsList) {
       try {
@@ -242,6 +248,14 @@ export const onRequestPost: PagesFunction<Env> = async (context): Promise<Respon
         if (emb && Array.isArray(emb) && emb.length > 0) {
           embeddings.push(emb);
           validTexts.push(post.text);
+          postEngagements.push({
+            views: post.views || 0,
+            likes: post.likes || 0,
+            replies: post.replies || 0,
+            reposts: post.reposts || 0,
+            quotes: post.quotes || 0,
+            mediaType: post.media_type || 'text',
+          });
         }
       } catch {}
     }
@@ -259,6 +273,68 @@ export const onRequestPost: PagesFunction<Env> = async (context): Promise<Respon
       labels = new Array(embeddings.length).fill(0);
       clusterCount = 1;
     }
+    
+    // Calculate weighted engagement and group by cluster/format
+    const weightedEngagements = postEngagements.map(e => 
+      (e.replies * 4) + (e.reposts * 5) + (e.quotes * 4) + (e.likes * 2)
+    );
+    
+    // Account total stats
+    let totalViews = 0, totalLikes = 0, totalReplies = 0, totalReposts = 0, totalQuotes = 0, totalWeightedEng = 0;
+    for (let i = 0; i < postEngagements.length; i++) {
+      const e = postEngagements[i];
+      totalViews += e.views;
+      totalLikes += e.likes;
+      totalReplies += e.replies;
+      totalReposts += e.reposts;
+      totalQuotes += e.quotes;
+      totalWeightedEng += weightedEngagements[i];
+    }
+    const totalPosts = postEngagements.length;
+    const engagementRate = totalViews > 0 ? (totalWeightedEng / totalViews) * 100 : 0;
+    
+    const accountStats = {
+      totalPosts,
+      totalViews,
+      totalLikes,
+      totalReplies,
+      totalReposts,
+      totalQuotes,
+      totalWeightedEngagement: totalWeightedEng,
+      engagementRate: Math.round(engagementRate * 100) / 100,
+    };
+    
+    // Group by cluster
+    const clusterStats: { id: number; name: string; postCount: number; avgEngagementRate: number; topEngagement: number }[] = [];
+    for (let c = 0; c < clusterCount; c++) {
+      const clusterIndices = labels.map((l: number, i: number) => l === c ? i : -1).filter((i: number) => i >= 0);
+      const clusterViews = clusterIndices.reduce((sum, i) => sum + postEngagements[i].views, 0);
+      const clusterWeightedEng = clusterIndices.reduce((sum, i) => sum + weightedEngagements[i], 0);
+      const clusterEngRate = clusterViews > 0 ? (clusterWeightedEng / clusterViews) * 100 : 0;
+      const topEng = clusterIndices.reduce((max, i) => Math.max(max, weightedEngagements[i]), 0);
+      clusterStats.push({
+        id: c,
+        name: `Cluster ${c}`,
+        postCount: clusterIndices.length,
+        avgEngagementRate: Math.round(clusterEngRate * 100) / 100,
+        topEngagement: topEng,
+      });
+    }
+    
+    // Group by format (media_type)
+    const formatMap: Record<string, { posts: number; views: number; weightedEng: number }> = {};
+    for (let i = 0; i < postEngagements.length; i++) {
+      const fmt = postEngagements[i].mediaType || 'text';
+      if (!formatMap[fmt]) formatMap[fmt] = { posts: 0, views: 0, weightedEng: 0 };
+      formatMap[fmt].posts++;
+      formatMap[fmt].views += postEngagements[i].views;
+      formatMap[fmt].weightedEng += weightedEngagements[i];
+    }
+    const formatStats = Object.entries(formatMap).map(([type, data]) => ({
+      type,
+      postCount: data.posts,
+      avgEngagementRate: data.views > 0 ? Math.round((data.weightedEng / data.views) * 10000) / 100 : 0,
+    }));
     
     // Build clusters with sampled posts for GPT
     const clusters: { id: number; posts: string[] }[] = [];
@@ -279,7 +355,45 @@ export const onRequestPost: PagesFunction<Env> = async (context): Promise<Respon
       ? validTexts.filter((_, i) => i % Math.ceil(validTexts.length / maxForGpt) === 0)
       : validTexts;
     
-    // Call GPT for topic analysis
+    // Call GPT for topic analysis with engagement data
+    const gptSystemPrompt = `你是一位社群媒體內容分析師。分析以下 Threads 貼文的語意叢集，為每個叢集命名並給出建議。
+以下是你帳號的真實數據，請基於這些數據給建議。千萬不要提及任何產業平均值或benchmark，因為我們沒有這些數據。
+
+## 帳號整體數據
+- 總貼文數: ${accountStats.totalPosts}
+- 總瀏覽量: ${accountStats.totalViews}
+- 總按讚數: ${accountStats.totalLikes}
+- 總回覆數: ${accountStats.totalReplies}
+- 總轉發數: ${accountStats.totalReposts}
+- 總引用數: ${accountStats.totalQuotes}
+- 總加權互動: ${accountStats.totalWeightedEngagement}
+- 互動率: ${accountStats.engagementRate}%
+
+## 叢集數據（加權互動 = 回覆×4 + 轉發×5 + 引用×4 + 按讚×2）
+${clusterStats.map(c => `- ${c.name}: ${c.postCount}篇, 平均互動率${c.avgEngagementRate}%, 最高互動${c.topEngagement}`).join('\n')}
+
+## 格式數據
+${formatStats.map(f => `- ${f.type}: ${f.postCount}篇, 平均互動率${f.avgEngagementRate}%`).join('\n')}
+
+每個叢集必須有一個「名稱」，這個名稱要能精準概括該叢集的內容主題（例如：「留學顧問觀點」、「生活日常分享」、「產業觀察評論」等）。
+回傳 JSON 格式：
+{
+  "clusters": [{ "id": number, "name": "叢集名稱", "keywords": "關鍵字1, 關鍵字2", "description": "描述", "postCount": number, "percentage": number, "avgEngagementRate": number, "topEngagement": number, "posts": ["代表貼文1", "代表貼文2"] }],
+  "healthAssessment": "整體內容健康度評估",
+  "nextPostSuggestions": ["建議1", "建議2", "建議3"],
+  "recommendations": ["策略建議1", "策略建議2", "策略建議3"]
+}`;
+
+    const gptUserData = {
+      clusters: clusters.map((c, i) => ({
+        ...c,
+        avgEngagementRate: clusterStats[i]?.avgEngagementRate || 0,
+        topEngagement: clusterStats[i]?.topEngagement || 0,
+      })),
+      formatStats,
+      allPosts: sampledAllPosts,
+    };
+    
     const gptResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -291,22 +405,8 @@ export const onRequestPost: PagesFunction<Env> = async (context): Promise<Respon
         temperature: 0.3,
         response_format: { type: 'json_object' },
         messages: [
-          {
-            role: 'system',
-            content: `你是一位社群媒體內容分析師。分析以下 Threads 貼文的語意叢集，為每個叢集命名並給出建議。
-每個叢集必須有一個「名稱」，這個名稱要能精準概括該叢集的內容主題（例如：「留學顧問觀點」、「生活日常分享」、「產業觀察評論」等）。
-回傳 JSON 格式：
-{
-  "clusters": [{ "id": number, "name": "叢集名稱", "keywords": "關鍵字1, 關鍵字2", "description": "描述", "postCount": number, "percentage": number, "posts": ["代表貼文1", "代表貼文2"] }],
-  "healthAssessment": "整體內容健康度評估",
-  "nextPostSuggestions": ["建議1", "建議2", "建議3"],
-  "recommendations": ["策略建議1", "策略建議2", "策略建議3"]
-}`
-          },
-          {
-            role: 'user',
-            content: JSON.stringify({ clusters: clusters, allPosts: sampledAllPosts })
-          }
+          { role: 'system', content: gptSystemPrompt },
+          { role: 'user', content: JSON.stringify(gptUserData) }
         ],
       }),
     });
@@ -342,6 +442,11 @@ export const onRequestPost: PagesFunction<Env> = async (context): Promise<Respon
       clusterCount,
       healthScore,
       points2D,
+      engagementStats: {
+        account: accountStats,
+        byCluster: clusterStats,
+        byFormat: formatStats,
+      },
       topicAnalysis: {
         ...topicAnalysis,
         healthScore,
