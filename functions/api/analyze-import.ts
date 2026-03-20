@@ -183,13 +183,13 @@ function calculateHealthScore(
   }
   const focus = interCount > 0 ? 1 - (interSim / interCount) : 0.5;
   
-  // Text analysis score (original formula)
-  const textAnalysisScore = concentration * 0.30 + coverage * 0.30 + coherence * 0.25 + focus * 0.15;
+  // Text analysis score (convert to 0-100)
+  const textAnalysisScore = (concentration * 0.30 + coverage * 0.30 + coherence * 0.25 + focus * 0.15) * 100;
   
   // Normalize engagement rate: 10% = 100 points, cap at 100
   const normalizedEngagement = Math.min(engagementRate * 10, 100);
   
-  // Final score: 70% text analysis + 30% engagement
+  // Final score: 70% text analysis + 30% engagement (both are 0-100)
   const finalScore = textAnalysisScore * 0.7 + normalizedEngagement * 0.3;
   
   return Math.round(finalScore * 100) / 100;
