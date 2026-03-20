@@ -201,18 +201,30 @@ export const onRequestPost: PagesFunction<Env> = async (context): Promise<Respon
     
     const lineUserId = payload.sub;
     
+    // Get Threads user ID from KV
+    const tokenStr = await context.env.THREADSIQ_STORE.get(`threads_token:${lineUserId}`);
+    if (!tokenStr) {
+      return new Response(JSON.stringify({ error: 'threads_not_connected' }), { status: 400, headers });
+    }
+    const tokenData = JSON.parse(tokenStr);
+    const threadsUserId = tokenData.threadsUserId || '';
+    
+    if (!threadsUserId) {
+      return new Response(JSON.stringify({ error: 'threads_not_connected' }), { status: 400, headers });
+    }
+    
     // Get user plan
     const userStr = await context.env.THREADSIQ_STORE.get(`user:${lineUserId}`);
     const userData = userStr ? JSON.parse(userStr) : {};
     const plan = userData.plan || 'free';
     
-    // Read posts with embeddings from D1
+    // Read posts with embeddings from D1 (filtered by current Threads account)
     const limit = plan === 'free' ? 30 : plan === 'creator' ? 300 : 10000;
     const posts = await context.env.THREADSIQ_DB.prepare(
       `SELECT id, text, embedding, posted_at FROM posts 
-       WHERE user_id = ? AND embedding IS NOT NULL AND text IS NOT NULL AND text != ''
+       WHERE user_id = ? AND threads_user_id = ? AND embedding IS NOT NULL AND text IS NOT NULL AND text != ''
        ORDER BY posted_at DESC LIMIT ?`
-    ).bind(lineUserId, limit).all<any>();
+    ).bind(lineUserId, threadsUserId, limit).all<any>();
     
     const postsList = posts.results || [];
     

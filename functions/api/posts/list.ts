@@ -21,6 +21,18 @@ export const onRequestGet: PagesFunction<Env> = async (context): Promise<Respons
     
     const lineUserId = payload.sub;
     
+    // Get Threads user ID from KV
+    const tokenStr = await context.env.THREADSIQ_STORE.get(`threads_token:${lineUserId}`);
+    if (!tokenStr) {
+      return new Response(JSON.stringify({ error: 'threads_not_connected' }), { status: 401, headers });
+    }
+    const tokenData = JSON.parse(tokenStr);
+    const threadsUserId = tokenData.threadsUserId || '';
+    
+    if (!threadsUserId) {
+      return new Response(JSON.stringify({ error: 'threads_not_connected' }), { status: 401, headers });
+    }
+    
     // Get query params for sorting and pagination
     const url = new URL(context.request.url);
     const sortBy = url.searchParams.get('sortBy') || 'posted_at';
@@ -38,10 +50,10 @@ export const onRequestGet: PagesFunction<Env> = async (context): Promise<Respons
     const userData = userStr ? JSON.parse(userStr) : {};
     const plan = userData.plan || 'free';
     
-    // Get total count first
+    // Get total count first (filtered by current Threads account)
     const countResult = await context.env.THREADSIQ_DB.prepare(
-      'SELECT COUNT(*) as count FROM posts WHERE user_id = ?'
-    ).bind(lineUserId).first<any>();
+      'SELECT COUNT(*) as count FROM posts WHERE user_id = ? AND threads_user_id = ?'
+    ).bind(lineUserId, threadsUserId).first<any>();
     
     const totalCount = countResult?.count || 0;
     
@@ -83,7 +95,7 @@ export const onRequestGet: PagesFunction<Env> = async (context): Promise<Respons
                  ROW_NUMBER() OVER (PARTITION BY threads_post_id ORDER BY fetched_at DESC) as rn
           FROM post_insights
         ) pi ON p.threads_post_id = pi.threads_post_id AND pi.rn = 1
-        WHERE p.user_id = ?
+        WHERE p.user_id = ? AND p.threads_user_id = ?
         ORDER BY p.posted_at DESC
         LIMIT 30
       `;
@@ -102,8 +114,8 @@ export const onRequestGet: PagesFunction<Env> = async (context): Promise<Respons
                  ROW_NUMBER() OVER (PARTITION BY threads_post_id ORDER BY fetched_at DESC) as rn
           FROM post_insights
         ) pi ON p.threads_post_id = pi.threads_post_id AND pi.rn = 1
-        WHERE p.user_id = ? AND (p.posted_at > ? OR p.id IN (
-          SELECT id FROM posts WHERE user_id = ? ORDER BY posted_at DESC LIMIT 300
+        WHERE p.user_id = ? AND p.threads_user_id = ? AND (p.posted_at > ? OR p.id IN (
+          SELECT id FROM posts WHERE user_id = ? AND threads_user_id = ? ORDER BY posted_at DESC LIMIT 300
         ))
         ${orderByClause}
         LIMIT ${effectivePageSize} OFFSET ${offset}
@@ -119,7 +131,7 @@ export const onRequestGet: PagesFunction<Env> = async (context): Promise<Respons
                  ROW_NUMBER() OVER (PARTITION BY threads_post_id ORDER BY fetched_at DESC) as rn
           FROM post_insights
         ) pi ON p.threads_post_id = pi.threads_post_id AND pi.rn = 1
-        WHERE p.user_id = ?
+        WHERE p.user_id = ? AND p.threads_user_id = ?
         ${orderByClause}
         LIMIT ${effectivePageSize} OFFSET ${offset}
       `;
@@ -130,9 +142,9 @@ export const onRequestGet: PagesFunction<Env> = async (context): Promise<Respons
       const sixMonthsAgo = new Date();
       sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
       const sixMonthsAgoStr = sixMonthsAgo.toISOString();
-      posts = await context.env.THREADSIQ_DB.prepare(query).bind(lineUserId, sixMonthsAgoStr, lineUserId).all<any>();
+      posts = await context.env.THREADSIQ_DB.prepare(query).bind(lineUserId, threadsUserId, sixMonthsAgoStr, lineUserId, threadsUserId).all<any>();
     } else {
-      posts = await context.env.THREADSIQ_DB.prepare(query).bind(lineUserId).all<any>();
+      posts = await context.env.THREADSIQ_DB.prepare(query).bind(lineUserId, threadsUserId).all<any>();
     }
     
     let postsList = posts.results || [];

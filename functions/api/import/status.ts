@@ -21,6 +21,18 @@ export const onRequestGet: PagesFunction<Env> = async (context): Promise<Respons
     
     const lineUserId = payload.sub;
     
+    // Get Threads user ID from KV
+    const tokenStr = await context.env.THREADSIQ_STORE.get(`threads_token:${lineUserId}`);
+    if (!tokenStr) {
+      return new Response(JSON.stringify({ error: 'threads_not_connected' }), { status: 401, headers });
+    }
+    const tokenData = JSON.parse(tokenStr);
+    const threadsUserId = tokenData.threadsUserId || '';
+    
+    if (!threadsUserId) {
+      return new Response(JSON.stringify({ error: 'threads_not_connected' }), { status: 401, headers });
+    }
+    
     // Get latest import job
     const job = await context.env.THREADSIQ_DB.prepare(
       `SELECT * FROM import_jobs WHERE user_id = ? ORDER BY started_at DESC LIMIT 1`
@@ -42,21 +54,21 @@ export const onRequestGet: PagesFunction<Env> = async (context): Promise<Respons
     const userData = userStr ? JSON.parse(userStr) : {};
     const plan = userData.plan || 'free';
     
-    // Calculate plan-based visible limits
-    const maxVisible = plan === 'free' ? 30 : plan === 'creator' ? 300 : totalPosts;
-    
-    // Get actual counts from D1 (live, not stale job record)
+    // Get actual counts from D1 (live, not stale job record) - filtered by current Threads account
     const countResult = await context.env.THREADSIQ_DB.prepare(
       `SELECT 
         COUNT(*) as total_posts,
         SUM(CASE WHEN embedding IS NOT NULL THEN 1 ELSE 0 END) as with_embedding,
         MIN(posted_at) as earliest_post,
         MAX(posted_at) as latest_post
-       FROM posts WHERE user_id = ?`
-    ).bind(lineUserId).first<any>();
+       FROM posts WHERE user_id = ? AND threads_user_id = ?`
+    ).bind(lineUserId, threadsUserId).first<any>();
     
     const totalPosts = countResult?.total_posts || 0;
     const withEmbedding = countResult?.with_embedding || 0;
+    
+    // Calculate plan-based visible limits (use totalPosts after it's defined)
+    const maxVisible = plan === 'free' ? 30 : plan === 'creator' ? 300 : totalPosts;
     
     // Cap counts by plan (don't leak Phase B data to non-pro users)
     const visiblePosts = Math.min(totalPosts, maxVisible);

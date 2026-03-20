@@ -72,6 +72,7 @@ export const onRequestPost: PagesFunction<Env> = async (context): Promise<Respon
     
     const tokenData = JSON.parse(tokenStr);
     const accessToken = tokenData.accessToken;
+    const threadsUserId = tokenData.threadsUserId || '';
     
     const isPhaseA = job.phase === 'a' && !job.phase_a_completed_at;
     const targetPosts = job.target_posts || 300;
@@ -139,10 +140,10 @@ export const onRequestPost: PagesFunction<Env> = async (context): Promise<Respon
       if (batch.length > 0) {
         const postStmts = batch.map(post =>
           context.env.THREADSIQ_DB.prepare(
-            `INSERT INTO posts (user_id, threads_post_id, text, posted_at, media_type, permalink)
-             VALUES (?, ?, ?, ?, ?, ?)
+            `INSERT INTO posts (user_id, threads_user_id, threads_post_id, text, posted_at, media_type, permalink)
+             VALUES (?, ?, ?, ?, ?, ?, ?)
              ON CONFLICT(threads_post_id) DO NOTHING`
-          ).bind(lineUserId, post.id, post.text || '', post.timestamp, post.media_type || null, post.permalink || '')
+          ).bind(lineUserId, threadsUserId, post.id, post.text || '', post.timestamp, post.media_type || null, post.permalink || '')
         );
         
         // Fetch insights for each post

@@ -53,11 +53,12 @@ export const onRequestPost: PagesFunction<Env> = async (context): Promise<Respon
     
     const tokenData = JSON.parse(tokenStr);
     const accessToken = tokenData.accessToken;
+    const threadsUserId = tokenData.threadsUserId || '';
     
-    // Get the latest post date in DB
+    // Get the latest post date in DB for the current Threads account
     const latestPost = await context.env.THREADSIQ_DB.prepare(
-      `SELECT posted_at FROM posts WHERE user_id = ? ORDER BY posted_at DESC LIMIT 1`
-    ).bind(lineUserId).first<any>();
+      `SELECT posted_at FROM posts WHERE user_id = ? AND threads_user_id = ? ORDER BY posted_at DESC LIMIT 1`
+    ).bind(lineUserId, threadsUserId).first<any>();
     
     const latestPostDate = latestPost?.posted_at ? new Date(latestPost.posted_at) : null;
     console.log(`Latest post in DB: ${latestPostDate?.toISOString() || 'none'}`);
@@ -153,10 +154,10 @@ export const onRequestPost: PagesFunction<Env> = async (context): Promise<Respon
       if (batch.length > 0) {
         const postStmts = batch.map(post => 
           context.env.THREADSIQ_DB.prepare(
-            `INSERT INTO posts (user_id, threads_post_id, text, posted_at, media_type, permalink)
-             VALUES (?, ?, ?, ?, ?, ?)
+            `INSERT INTO posts (user_id, threads_user_id, threads_post_id, text, posted_at, media_type, permalink)
+             VALUES (?, ?, ?, ?, ?, ?, ?)
              ON CONFLICT(threads_post_id) DO NOTHING`
-          ).bind(lineUserId, post.id, post.text || '', post.timestamp, post.media_type || null, post.permalink || '')
+          ).bind(lineUserId, threadsUserId, post.id, post.text || '', post.timestamp, post.media_type || null, post.permalink || '')
         );
         
         const insightStmts: any[] = [];
