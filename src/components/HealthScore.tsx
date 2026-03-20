@@ -90,6 +90,36 @@ export default function HealthScore({ score, assessment }: HealthScoreProps) {
           {assessment}
         </span>
       </div>
+
+      {/* Score Interpretation Guide */}
+      <div className="mt-6 text-left w-full max-w-md">
+        <h4 className="text-sm font-semibold text-gray-400 mb-2">分數怎麼看？</h4>
+        <div className="space-y-2 text-sm">
+          <div className="flex items-start gap-2">
+            <span className="text-green-500 font-bold">80-100</span>
+            <span className="text-gray-500">：頂尖表現，內容高度聚焦且多元</span>
+          </div>
+          <div className="flex items-start gap-2">
+            <span className="text-lime-500 font-bold">60-79</span>
+            <span className="text-gray-500">：良好，內容有一定主題性</span>
+          </div>
+          <div className="flex items-start gap-2">
+            <span className="text-yellow-500 font-bold">40-59</span>
+            <span className="text-gray-500">：普通，需增加內容聚焦度</span>
+          </div>
+          <div className="flex items-start gap-2">
+            <span className="text-orange-500 font-bold">20-39</span>
+            <span className="text-gray-500">：分散，內容太過多元需整合</span>
+          </div>
+          <div className="flex items-start gap-2">
+            <span className="text-red-500 font-bold">0-19</span>
+            <span className="text-gray-500">：混亂，主題過於發散，建議重新定位</span>
+          </div>
+        </div>
+        <div className="mt-3 pt-3 border-t border-white/10 text-xs text-gray-600">
+          💡 提升方向：增加主題聚焦、善用圖片/影片格式、提高互動率
+        </div>
+      </div>
     </div>
   );
 }
