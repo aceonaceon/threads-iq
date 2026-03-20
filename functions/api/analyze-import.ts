@@ -234,17 +234,24 @@ export const onRequestPost: PagesFunction<Env> = async (context): Promise<Respon
     const plan = userData.plan || 'free';
     
     // Read posts with embeddings from D1 (filtered by current Threads account)
+    // Use CTE + ROW_NUMBER() to get only the latest insight per post
     const limit = plan === 'free' ? 30 : plan === 'creator' ? 300 : 10000;
     const posts = await context.env.THREADSIQ_DB.prepare(
-      `SELECT p.id, p.text, p.embedding, p.posted_at, p.media_type, p.threads_post_id,
+      `WITH latest_insights AS (
+         SELECT id, threads_post_id, user_id, views, likes, replies, reposts, quotes, fetched_at,
+                ROW_NUMBER() OVER (PARTITION BY user_id, threads_post_id ORDER BY fetched_at DESC, id DESC) as rn
+         FROM post_insights
+         WHERE user_id = ?
+       )
+       SELECT p.id, p.text, p.embedding, p.posted_at, p.media_type, p.threads_post_id,
               COALESCE(i.views, 0) as views, COALESCE(i.likes, 0) as likes,
               COALESCE(i.replies, 0) as replies, COALESCE(i.reposts, 0) as reposts,
               COALESCE(i.quotes, 0) as quotes
        FROM posts p
-       LEFT JOIN post_insights i ON p.threads_post_id = i.threads_post_id AND p.user_id = i.user_id
+       LEFT JOIN latest_insights i ON p.threads_post_id = i.threads_post_id AND p.user_id = i.user_id AND i.rn = 1
        WHERE p.user_id = ? AND p.threads_user_id = ? AND p.embedding IS NOT NULL AND p.text IS NOT NULL AND p.text != ''
        ORDER BY p.posted_at DESC LIMIT ?`
-    ).bind(lineUserId, threadsUserId, limit).all<any>();
+    ).bind(lineUserId, lineUserId, threadsUserId, limit).all<any>();
     
     const postsList = posts.results || [];
     

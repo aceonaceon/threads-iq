@@ -170,7 +170,10 @@ export const onRequestPost: PagesFunction<Env> = async (context): Promise<Respon
             insightStmts.push(
               context.env.THREADSIQ_DB.prepare(
                 `INSERT INTO post_insights (threads_post_id, user_id, views, likes, replies, reposts, quotes, fetched_at)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))`
+                 VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+                 ON CONFLICT(user_id, threads_post_id) DO UPDATE SET
+                   views=excluded.views, likes=excluded.likes, replies=excluded.replies,
+                   reposts=excluded.reposts, quotes=excluded.quotes, fetched_at=datetime('now')`
               ).bind(post.id, lineUserId, views, likes, replies, reposts, quotes)
             );
           } catch {
