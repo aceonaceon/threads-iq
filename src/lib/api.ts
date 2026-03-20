@@ -22,12 +22,37 @@ export interface TopicAnalysis {
   recommendations: string[];
 }
 
+export interface EngagementStats {
+  account: {
+    totalPosts: number;
+    totalViews: number;
+    totalLikes: number;
+    totalReplies: number;
+    totalReposts: number;
+    totalQuotes: number;
+    totalWeightedEngagement: number;
+    engagementRate: string;
+  };
+  byCluster: {
+    name: string;
+    postCount: number;
+    avgEngagementRate: string;
+    topEngagement: string;
+  }[];
+  byFormat: {
+    type: string;
+    postCount: number;
+    avgEngagementRate: string;
+  }[];
+}
+
 export interface AnalysisResult {
   id: string;
   embeddings: number[][];
   points2D: number[][];
   labels: number[];
   topicAnalysis: TopicAnalysis;
+  engagementStats?: EngagementStats;
   remainingUses: number;
   bonusRemaining: number;
 }

@@ -23,7 +23,7 @@ const CLUSTER_COLORS = [
 export default function AnalysisReport({ result, posts }: AnalysisReportProps) {
   const [expandedClusters, setExpandedClusters] = useState<Set<number>>(new Set());
 
-  const { points2D, labels, topicAnalysis } = result;
+  const { points2D, labels, topicAnalysis, engagementStats } = result;
   const { clusters, healthScore, healthAssessment, nextPostSuggestions, recommendations } = topicAnalysis;
 
   const toggleCluster = (idx: number) => {
@@ -62,6 +62,63 @@ export default function AnalysisReport({ result, posts }: AnalysisReportProps) {
           低分表示內容過於分散。
         </p>
       </div>
+
+      {/* Engagement Stats */}
+      {engagementStats && (
+        <div className="bg-surface rounded-2xl p-6 animate-fade-in" style={{ animationDelay: '0.15s' }}>
+          <h2 className="text-xl font-bold mb-4">📊 貼文表現數據</h2>
+          
+          {/* Account Summary */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div className="bg-white/5 rounded-xl p-4 text-center">
+              <div className="text-2xl font-bold text-accent">{engagementStats.account.totalViews.toLocaleString()}</div>
+              <div className="text-sm text-gray-500">總瀏覽</div>
+            </div>
+            <div className="bg-white/5 rounded-xl p-4 text-center">
+              <div className="text-2xl font-bold text-accent">{engagementStats.account.engagementRate}</div>
+              <div className="text-sm text-gray-500">互動率</div>
+            </div>
+            <div className="bg-white/5 rounded-xl p-4 text-center">
+              <div className="text-2xl font-bold text-accent">{engagementStats.account.totalLikes.toLocaleString()}</div>
+              <div className="text-sm text-gray-500">總愛心</div>
+            </div>
+            <div className="bg-white/5 rounded-xl p-4 text-center">
+              <div className="text-2xl font-bold text-accent">{engagementStats.account.totalReplies.toLocaleString()}</div>
+              <div className="text-sm text-gray-500">總回覆</div>
+            </div>
+          </div>
+
+          {/* By Cluster */}
+          {engagementStats.byCluster.length > 0 && (
+            <div className="mb-4">
+              <h3 className="font-semibold mb-2">叢集表現</h3>
+              <div className="space-y-2">
+                {engagementStats.byCluster.map((c, i) => (
+                  <div key={i} className="flex justify-between items-center bg-white/5 rounded-lg px-4 py-2">
+                    <span>{c.name}</span>
+                    <span className="text-accent font-medium">{c.avgEngagementRate} 互動率</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* By Format */}
+          {engagementStats.byFormat.length > 0 && (
+            <div>
+              <h3 className="font-semibold mb-2">格式表現</h3>
+              <div className="flex gap-4">
+                {engagementStats.byFormat.map((f, i) => (
+                  <div key={i} className="flex-1 bg-white/5 rounded-lg px-4 py-2 text-center">
+                    <div className="font-medium">{f.type || '未知'}</div>
+                    <div className="text-accent">{f.avgEngagementRate}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Semantic Cluster Map */}
       <div className="bg-surface rounded-2xl p-6 animate-fade-in" style={{ animationDelay: '0.1s' }}>
