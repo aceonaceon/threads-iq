@@ -20,14 +20,37 @@ export const onRequestPost: PagesFunction<Env> = async (context): Promise<Respon
     }
     
     const lineUserId = payload.sub;
+
+    // Get Threads user ID from KV (scope embedding to current connected account)
+    const tokenStr = await context.env.THREADSIQ_STORE.get(`threads_token:${lineUserId}`);
+    if (!tokenStr) {
+      return new Response(JSON.stringify({ error: 'threads_not_connected' }), { status: 400, headers });
+    }
+    const tokenData = JSON.parse(tokenStr);
+    const threadsUserId = tokenData.threadsUserId || '';
+    if (!threadsUserId) {
+      return new Response(JSON.stringify({ error: 'threads_not_connected' }), { status: 400, headers });
+    }
+
+    // Use latest import job target as Phase A embedding scope (creator=300, pro=1000)
+    const latestJob = await context.env.THREADSIQ_DB.prepare(
+      `SELECT target_posts FROM import_jobs WHERE user_id = ? ORDER BY started_at DESC LIMIT 1`
+    ).bind(lineUserId).first<any>();
+    const phaseATarget = latestJob?.target_posts || 300;
     
-    // Get posts without embeddings (batch of 100 at a time)
+    // Get posts without embeddings within Phase A scope only (batch of 100 at a time)
     const posts = await context.env.THREADSIQ_DB.prepare(
-      `SELECT id, text FROM posts 
-       WHERE user_id = ? AND embedding IS NULL AND text IS NOT NULL AND text != ''
-       ORDER BY posted_at DESC
+      `WITH phase_a_posts AS (
+         SELECT id, text, embedding
+         FROM posts
+         WHERE user_id = ? AND threads_user_id = ? AND text IS NOT NULL AND text != ''
+         ORDER BY posted_at DESC
+         LIMIT ?
+       )
+       SELECT id, text FROM phase_a_posts
+       WHERE embedding IS NULL
        LIMIT 100`
-    ).bind(lineUserId).all<any>();
+    ).bind(lineUserId, threadsUserId, phaseATarget).all<any>();
     
     const postsToEmbed = posts.results || [];
     
@@ -98,22 +121,41 @@ export const onRequestPost: PagesFunction<Env> = async (context): Promise<Respon
       updated += Math.min(100, updateStmts.length - i);
     }
     
-    // Check remaining
+    // Check remaining within Phase A scope only
     const remaining = await context.env.THREADSIQ_DB.prepare(
-      `SELECT COUNT(*) as count FROM posts 
-       WHERE user_id = ? AND embedding IS NULL AND text IS NOT NULL AND text != ''`
-    ).bind(lineUserId).first<any>();
+      `WITH phase_a_posts AS (
+         SELECT id, embedding
+         FROM posts
+         WHERE user_id = ? AND threads_user_id = ? AND text IS NOT NULL AND text != ''
+         ORDER BY posted_at DESC
+         LIMIT ?
+       )
+       SELECT COUNT(*) as count FROM phase_a_posts
+       WHERE embedding IS NULL`
+    ).bind(lineUserId, threadsUserId, phaseATarget).first<any>();
     
     const remainingCount = remaining?.count || 0;
+
+    const withEmbedding = await context.env.THREADSIQ_DB.prepare(
+      `WITH phase_a_posts AS (
+         SELECT id, embedding
+         FROM posts
+         WHERE user_id = ? AND threads_user_id = ? AND text IS NOT NULL AND text != ''
+         ORDER BY posted_at DESC
+         LIMIT ?
+       )
+       SELECT COUNT(*) as count FROM phase_a_posts
+       WHERE embedding IS NOT NULL`
+    ).bind(lineUserId, threadsUserId, phaseATarget).first<any>();
+    const withEmbeddingCount = withEmbedding?.count || 0;
     
-    // Update import job
+    // Update import job with scoped embedding progress
     await context.env.THREADSIQ_DB.prepare(
-      `UPDATE import_jobs SET total_with_embedding = (
-        SELECT COUNT(*) FROM posts WHERE user_id = ? AND embedding IS NOT NULL
-      ) WHERE user_id = ? AND id = (
+      `UPDATE import_jobs SET total_with_embedding = ?
+       WHERE user_id = ? AND id = (
         SELECT MAX(id) FROM import_jobs WHERE user_id = ?
-      )`
-    ).bind(lineUserId, lineUserId, lineUserId).run();
+       )`
+    ).bind(withEmbeddingCount, lineUserId, lineUserId).run();
     
     return new Response(JSON.stringify({
       status: remainingCount > 0 ? 'in_progress' : 'complete',

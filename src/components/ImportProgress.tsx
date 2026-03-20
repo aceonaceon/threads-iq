@@ -226,7 +226,8 @@ export default function ImportProgress({ onImportComplete, onError }: ImportProg
           }
 
           if (data.status === 'in_progress') {
-            setEmbeddingProgress(target - (data.remaining || 0));
+            const done = target - (data.remaining || 0);
+            setEmbeddingProgress(Math.max(0, Math.min(target, done)));
           }
 
           // Wait 2 seconds between batches
