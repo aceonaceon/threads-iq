@@ -157,6 +157,7 @@ export default function Analyze() {
         remainingUses: 0,
         bonusRemaining: 0,
         topicAnalysis: serverResult.topicAnalysis,
+        engagementStats: serverResult.engagementStats,
       };
       
       // Save to cloud (include posts text for report display)
